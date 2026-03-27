@@ -2,11 +2,9 @@ FROM maven:3.9.9-eclipse-temurin-21 AS build
 
 WORKDIR /workspace
 COPY backend/.mvn /workspace/backend/.mvn
-COPY backend/mvnw /workspace/backend/mvnw
 COPY backend/pom.xml /workspace/backend/pom.xml
-RUN chmod +x /workspace/backend/mvnw
 COPY backend/src /workspace/backend/src
-RUN /workspace/backend/mvnw -f /workspace/backend/pom.xml -DskipTests package
+RUN mvn -f /workspace/backend/pom.xml -DskipTests package
 
 FROM eclipse-temurin:21-jre-jammy
 
@@ -16,7 +14,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY crawler/requirements.txt /app/crawler/requirements.txt
-RUN pip3 install --no-cache-dir -r /app/crawler/requirements.txt
+RUN pip3 install --no-cache-dir \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    --trusted-host pypi.tuna.tsinghua.edu.cn \
+    -r /app/crawler/requirements.txt
 
 COPY crawler /app/crawler
 COPY --from=build /workspace/backend/target/*.jar /app/backend.jar
