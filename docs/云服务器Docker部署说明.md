@@ -7,8 +7,6 @@
 ```powershell
 cd D:\project\GeekMelon
 git remote add origin https://github.com/DQM-Venus/GeekMelon.git
-git add .
-git commit -m "feat: add docker deployment"
 git push -u origin master
 ```
 
@@ -42,7 +40,7 @@ dnf -y install docker-ce docker-ce-cli containerd.io docker-compose-plugin
 systemctl enable --now docker
 ```
 
-开放 80 端口：
+放行 HTTP 端口：
 
 ```bash
 firewall-cmd --permanent --add-service=http || true
@@ -65,14 +63,14 @@ mkdir -p /opt/geekmelon/logs
 
 ```bash
 cat >/opt/geekmelon/env/.env <<'EOF'
-GM_DB_URL=jdbc:mysql://host.docker.internal:3306/geek_melon?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+GM_DB_URL=jdbc:mysql://127.0.0.1:3306/geek_melon?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
 GM_DB_USERNAME=geekmelon_app
-GM_DB_PASSWORD=Gm2026#Tunnel#DB9xP4q
-GM_INGEST_TOKEN=geekmelon-dev-token
+GM_DB_PASSWORD=请填写数据库密码
+GM_INGEST_TOKEN=请填写采集令牌
 GM_ADMIN_USERNAME=admin
-GM_ADMIN_PASSWORD=geekmelon-admin
+GM_ADMIN_PASSWORD=请填写后台密码
 GM_EDITORIAL_ENABLED=true
-DEEPSEEK_API_KEY=你的-DeepSeek-Key
+DEEPSEEK_API_KEY=请填写你的DeepSeek-Key
 GM_EDITORIAL_MODEL=deepseek-chat
 GM_EDITORIAL_BASE_URL=https://api.deepseek.com
 GM_EDITORIAL_REQUEST_TIMEOUT_SECONDS=20
@@ -81,6 +79,12 @@ GM_EDITORIAL_CANDIDATE_COUNT=10
 GM_EDITORIAL_CACHE_TTL_SECONDS=300
 EOF
 ```
+
+说明：
+
+- 线上沿用宿主机现有 MySQL，不新建数据库容器。
+- 当前 MySQL 只监听 `127.0.0.1:3306`，所以本项目三个容器统一走宿主机网络。
+- 这样后端和 crawler 都可以直接访问服务器本机 MySQL，不需要改数据库监听配置。
 
 如果暂时不想在线上启用首页主编精选，可以把：
 

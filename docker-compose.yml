@@ -5,10 +5,9 @@ services:
       dockerfile: frontend/Dockerfile
     image: geekmelon-frontend:latest
     restart: unless-stopped
+    network_mode: host
     depends_on:
       - backend
-    ports:
-      - "80:80"
 
   backend:
     build:
@@ -16,8 +15,7 @@ services:
       dockerfile: backend/Dockerfile
     image: geekmelon-backend:latest
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    network_mode: host
     environment:
       GM_DB_URL: ${GM_DB_URL}
       GM_DB_USERNAME: ${GM_DB_USERNAME}
@@ -37,8 +35,6 @@ services:
       GM_CRAWLER_PYTHON_COMMAND: python3
       GM_CRAWLER_WORKING_DIRECTORY: /app/crawler
       GM_CRAWLER_API_BASE_URL: http://127.0.0.1:8080
-    expose:
-      - "8080"
 
   crawler:
     build:
@@ -47,10 +43,9 @@ services:
     image: geekmelon-crawler:latest
     profiles:
       - tools
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    network_mode: host
     environment:
-      GM_API_BASE_URL: http://backend:8080
+      GM_API_BASE_URL: http://127.0.0.1:8080
       GM_DB_URL: ${GM_DB_URL}
       GM_DB_USERNAME: ${GM_DB_USERNAME}
       GM_DB_PASSWORD: ${GM_DB_PASSWORD}
