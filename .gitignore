@@ -1,0 +1,11 @@
+backend/target/
+*.log
+.idea/
+.vscode/
+.env
+frontend/dist/
+frontend/node_modules/
+crawler/__pycache__/
+crawler/tests/__pycache__/
+backend/run/
+logs/

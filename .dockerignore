@@ -1,0 +1,13 @@
+.git
+.gitignore
+.idea
+.vscode
+backend/target
+frontend/dist
+frontend/node_modules
+crawler/__pycache__
+crawler/tests/__pycache__
+backend/run
+logs
+*.log
+*.pyc

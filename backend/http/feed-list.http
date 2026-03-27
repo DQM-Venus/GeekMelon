@@ -1,0 +1,2 @@
+GET http://127.0.0.1:8080/api/feeds?page=1&page_size=10&sort=latest
+

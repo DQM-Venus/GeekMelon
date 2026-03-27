@@ -1,0 +1,54 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: geekmelon-backend
+  datasource:
+    url: ${GM_DB_URL:jdbc:mysql://127.0.0.1:3307/geek_melon?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false}
+    username: ${GM_DB_USERNAME:geekmelon_app}
+    password: ${GM_DB_PASSWORD:Gm2026#Tunnel#DB9xP4q}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jackson:
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+geekmelon:
+  ingest:
+    token: ${GM_INGEST_TOKEN:geekmelon-dev-token}
+  admin:
+    username: ${GM_ADMIN_USERNAME:admin}
+    password: ${GM_ADMIN_PASSWORD:geekmelon-admin}
+  crawler:
+    python-command: ${GM_CRAWLER_PYTHON_COMMAND:python}
+    working-directory: ${GM_CRAWLER_WORKING_DIRECTORY:../crawler}
+    runner-mode: ${GM_CRAWLER_RUNNER_MODE:local}
+    api-base-url: ${GM_CRAWLER_API_BASE_URL:http://127.0.0.1:8080}
+  editorial:
+    enabled: ${GM_EDITORIAL_ENABLED:false}
+    api-key: ${DEEPSEEK_API_KEY:}
+    base-url: ${GM_EDITORIAL_BASE_URL:https://api.deepseek.com}
+    model: ${GM_EDITORIAL_MODEL:deepseek-chat}
+    request-timeout-seconds: ${GM_EDITORIAL_REQUEST_TIMEOUT_SECONDS:20}
+    pick-count: ${GM_EDITORIAL_PICK_COUNT:6}
+    candidate-count: ${GM_EDITORIAL_CANDIDATE_COUNT:10}
+    cache-ttl-seconds: ${GM_EDITORIAL_CACHE_TTL_SECONDS:300}

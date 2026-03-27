@@ -1,0 +1,22 @@
+{
+  "source": "v2ex",
+  "source_post_id": "demo-001",
+  "source_url": "https://www.v2ex.com/t/123456",
+  "title": "某开源 AI IDE 发布新版本",
+  "author_name": "melon_user",
+  "raw_content": "正文清洗后的纯文本内容，用于验证 ingest 接口是否能正常接收并落库。",
+  "raw_publish_time": "2026-03-26T10:00:00+08:00",
+  "summary": "1. 发布了新版本。\n2. 增强了 Agent 能力。\n3. 社区反馈偏积极。",
+  "highlight": "AI IDE 开始从补全工具卷向全流程开发助手。",
+  "category": "产品发布",
+  "tags": [
+    "AI IDE",
+    "Agent",
+    "开发工具"
+  ],
+  "spicy_index": 8,
+  "verdict": "keep",
+  "drop_reason": null,
+  "ai_model": "deepseek-chat",
+  "ai_prompt_version": "v1.0"
+}
