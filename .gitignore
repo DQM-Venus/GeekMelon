@@ -9,3 +9,7 @@ crawler/__pycache__/
 crawler/tests/__pycache__/
 backend/run/
 logs/
+__pycache__/
+*.pyc
+*.pyo
+*.tsbuildinfo
