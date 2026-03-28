@@ -7,6 +7,13 @@ public record PageResult<T>(
         long total,
         int page,
         int pageSize,
-        int totalPages
+        int totalPages,
+        String effectiveDateScope,
+        String effectiveDate,
+        Boolean emptyFallback
 ) {
+
+    public PageResult(List<T> records, long total, int page, int pageSize, int totalPages) {
+        this(records, total, page, pageSize, totalPages, null, null, null);
+    }
 }

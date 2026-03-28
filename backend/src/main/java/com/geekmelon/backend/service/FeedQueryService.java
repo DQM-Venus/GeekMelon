@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -30,6 +31,7 @@ public class FeedQueryService {
     private static final int HOMEPAGE_DIVERSITY_WINDOW = 6;
     private static final int DIVERSITY_SCAN_WINDOW = 8;
     private static final ZoneId SHANGHAI_ZONE = ZoneId.of("Asia/Shanghai");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final AiNewsFeedRepository aiNewsFeedRepository;
     private final HomepageEditorialService homepageEditorialService;
@@ -60,7 +62,7 @@ public class FeedQueryService {
         String normalizedDateScope = normalizeDateScope(safePage, source, category, minSpicyIndex, dateScope);
         boolean homepageRequest = isHomepageRequest(safePage, source, category, minSpicyIndex, normalizedDateScope);
 
-        List<FeedListItemResponse> allRecords = buildPublicRecords(
+        FeedQueryResolution resolution = resolveHomepageWindow(
                 source,
                 category,
                 minSpicyIndex,
@@ -68,18 +70,38 @@ public class FeedQueryService {
                 sort,
                 homepageRequest
         );
+        List<FeedListItemResponse> allRecords = resolution.records();
         int total = allRecords.size();
+
         if (fetchAll) {
             int effectivePageSize = total == 0 ? safePageSize : total;
-            return new PageResult<>(allRecords, total, 1, effectivePageSize, total == 0 ? 0 : 1);
+            return new PageResult<>(
+                    allRecords,
+                    total,
+                    1,
+                    effectivePageSize,
+                    total == 0 ? 0 : 1,
+                    resolution.effectiveDateScope(),
+                    resolution.effectiveDate() == null ? null : DATE_FORMATTER.format(resolution.effectiveDate()),
+                    resolution.emptyFallback()
+            );
         }
 
         int totalPages = total == 0 ? 0 : (int) Math.ceil((double) total / safePageSize);
         int fromIndex = Math.min((safePage - 1) * safePageSize, total);
         int toIndex = Math.min(fromIndex + safePageSize, total);
-
         List<FeedListItemResponse> records = allRecords.subList(fromIndex, toIndex);
-        return new PageResult<>(records, total, safePage, safePageSize, totalPages);
+
+        return new PageResult<>(
+                records,
+                total,
+                safePage,
+                safePageSize,
+                totalPages,
+                resolution.effectiveDateScope(),
+                resolution.effectiveDate() == null ? null : DATE_FORMATTER.format(resolution.effectiveDate()),
+                resolution.emptyFallback()
+        );
     }
 
     public FeedDetailResponse detail(Long id) {
@@ -90,11 +112,67 @@ public class FeedQueryService {
     }
 
     public Set<Long> resolveAutomaticEditorialIds() {
-        List<FeedListItemResponse> automaticCandidates = buildAutomaticEditorialBase("latest", "yesterday");
+        LocalDate yesterday = LocalDate.now(SHANGHAI_ZONE).minusDays(1);
+        List<FeedListItemResponse> automaticCandidates = buildAutomaticEditorialBase("latest", yesterday);
         return automaticCandidates.stream()
                 .filter(item -> Boolean.TRUE.equals(item.editorPick()))
                 .map(FeedListItemResponse::id)
                 .collect(LinkedHashSet::new, Set::add, Set::addAll);
+    }
+
+    private FeedQueryResolution resolveHomepageWindow(
+            String source,
+            String category,
+            Integer minSpicyIndex,
+            String dateScope,
+            String sort,
+            boolean homepageRequest
+    ) {
+        LocalDate requestedDate = "yesterday".equals(dateScope) ? LocalDate.now(SHANGHAI_ZONE).minusDays(1) : null;
+        List<FeedListItemResponse> requestedRecords = buildPublicRecords(
+                source,
+                category,
+                minSpicyIndex,
+                dateScope,
+                sort,
+                homepageRequest,
+                requestedDate
+        );
+
+        if (!homepageRequest || !"yesterday".equals(dateScope) || !requestedRecords.isEmpty()) {
+            return new FeedQueryResolution(
+                    requestedRecords,
+                    dateScope,
+                    requestedDate,
+                    false
+            );
+        }
+
+        LocalDate fallbackDate = resolveLatestPublicDate(source, category, minSpicyIndex);
+        if (fallbackDate == null || fallbackDate.equals(requestedDate)) {
+            return new FeedQueryResolution(requestedRecords, dateScope, requestedDate, false);
+        }
+
+        List<FeedListItemResponse> fallbackRecords = buildPublicRecords(
+                source,
+                category,
+                minSpicyIndex,
+                dateScope,
+                sort,
+                homepageRequest,
+                fallbackDate
+        );
+        return new FeedQueryResolution(fallbackRecords, "fallback", fallbackDate, true);
+    }
+
+    private LocalDate resolveLatestPublicDate(String source, String category, Integer minSpicyIndex) {
+        return queryActiveFeeds(source, category, minSpicyIndex, true)
+                .stream()
+                .map(this::effectiveCreatedAt)
+                .filter(Objects::nonNull)
+                .map(LocalDateTime::toLocalDate)
+                .max(LocalDate::compareTo)
+                .orElse(null);
     }
 
     private List<FeedListItemResponse> buildPublicRecords(
@@ -103,17 +181,18 @@ public class FeedQueryService {
             Integer minSpicyIndex,
             String dateScope,
             String sort,
-            boolean homepageRequest
+            boolean homepageRequest,
+            LocalDate targetDate
     ) {
         boolean hasSourceFilter = StringUtils.hasText(source);
         List<AiNewsFeed> feeds = queryActiveFeeds(source, category, minSpicyIndex, !hasSourceFilter);
-        feeds = applyDateScope(feeds, dateScope);
+        feeds = applyDateScope(feeds, dateScope, targetDate);
 
         List<AiNewsFeed> workingFeeds = feeds;
         List<FeedListItemResponse> leadingFeatured = List.of();
 
         if (homepageRequest) {
-            List<AiNewsFeed> featuredFeeds = applyDateScope(queryFeaturedFeeds(), dateScope);
+            List<AiNewsFeed> featuredFeeds = applyDateScope(queryFeaturedFeeds(), dateScope, targetDate);
             Set<Long> featuredIds = featuredFeeds.stream()
                     .map(AiNewsFeed::getId)
                     .collect(LinkedHashSet::new, Set::add, Set::addAll);
@@ -147,12 +226,12 @@ public class FeedQueryService {
         return records;
     }
 
-    private List<FeedListItemResponse> buildAutomaticEditorialBase(String sort, String dateScope) {
-        List<AiNewsFeed> featuredFeeds = applyDateScope(queryFeaturedFeeds(), dateScope);
+    private List<FeedListItemResponse> buildAutomaticEditorialBase(String sort, LocalDate targetDate) {
+        List<AiNewsFeed> featuredFeeds = applyDateScope(queryFeaturedFeeds(), "yesterday", targetDate);
         Set<Long> featuredIds = featuredFeeds.stream()
                 .map(AiNewsFeed::getId)
                 .collect(LinkedHashSet::new, Set::add, Set::addAll);
-        List<AiNewsFeed> feeds = applyDateScope(queryActiveFeeds(null, null, null, true), dateScope)
+        List<AiNewsFeed> feeds = applyDateScope(queryActiveFeeds(null, null, null, true), "yesterday", targetDate)
                 .stream()
                 .filter(feed -> !featuredIds.contains(feed.getId()))
                 .sorted(buildComparator(sort))
@@ -224,13 +303,13 @@ public class FeedQueryService {
         return aiNewsFeedRepository.findAllByAdminFeaturedTrueAndStatusOrderByAdminFeaturedRankAscAdminUpdatedAtDesc("active");
     }
 
-    private List<AiNewsFeed> applyDateScope(List<AiNewsFeed> feeds, String dateScope) {
+    private List<AiNewsFeed> applyDateScope(List<AiNewsFeed> feeds, String dateScope, LocalDate targetDate) {
         if (!"yesterday".equals(dateScope)) {
             return feeds;
         }
 
-        LocalDate yesterday = LocalDate.now(SHANGHAI_ZONE).minusDays(1);
-        LocalDateTime start = yesterday.atStartOfDay();
+        LocalDate effectiveDate = targetDate == null ? LocalDate.now(SHANGHAI_ZONE).minusDays(1) : targetDate;
+        LocalDateTime start = effectiveDate.atStartOfDay();
         LocalDateTime end = start.plusDays(1);
 
         return feeds.stream()
@@ -321,7 +400,9 @@ public class FeedQueryService {
             case "cls" -> 100;
             case "qbitai" -> 95;
             case "kr36" -> 90;
-            case "jiqizhixin" -> 88;
+            case "zhidx" -> 88;
+            case "aibase" -> 86;
+            case "jiqizhixin" -> 84;
             case "toutiao" -> 80;
             case "rss" -> 70;
             case "juejin" -> 55;
@@ -445,5 +526,13 @@ public class FeedQueryService {
                 .map(String::trim)
                 .filter(StringUtils::hasText)
                 .toList();
+    }
+
+    private record FeedQueryResolution(
+            List<FeedListItemResponse> records,
+            String effectiveDateScope,
+            LocalDate effectiveDate,
+            boolean emptyFallback
+    ) {
     }
 }

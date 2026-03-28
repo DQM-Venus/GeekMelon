@@ -5,7 +5,9 @@ from dataclasses import replace
 
 import requests
 
+from analyzers.rule_evaluator import should_drop_item
 from app_config import AppConfig
+from editorial_rules import apply_source_specific_penalty
 from feed_item import FeedItem
 
 
@@ -17,6 +19,9 @@ class DeepSeekAnalyzer:
         self._endpoint = f"{config.deepseek_base_url}/chat/completions"
 
     def analyze(self, item: FeedItem) -> FeedItem | None:
+        if should_drop_item(item):
+            return None
+
         payload = {
             "model": self._config.deepseek_model,
             "response_format": {"type": "json_object"},
@@ -75,6 +80,13 @@ class DeepSeekAnalyzer:
             spicy_index = int(spicy_index)
         except (TypeError, ValueError):
             spicy_index = item.spicy_index
+        spicy_index = max(
+            1,
+            min(
+                spicy_index - apply_source_specific_penalty(item.source, item.title, item.raw_content),
+                10,
+            ),
+        )
 
         return replace(
             item,
@@ -82,7 +94,7 @@ class DeepSeekAnalyzer:
             highlight=str(parsed.get("highlight", item.highlight)).strip() or item.highlight,
             category=str(parsed.get("category", item.category)).strip() or item.category,
             tags=[str(tag).strip() for tag in tags if str(tag).strip()] or item.tags,
-            spicy_index=max(1, min(spicy_index, 10)),
+            spicy_index=spicy_index,
             verdict=verdict,
             drop_reason=parsed.get("drop_reason"),
             ai_model=self._config.deepseek_model,

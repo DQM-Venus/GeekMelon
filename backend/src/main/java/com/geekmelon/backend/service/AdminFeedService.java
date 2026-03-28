@@ -1,5 +1,6 @@
 package com.geekmelon.backend.service;
 
+import com.geekmelon.backend.dto.AdminFeedBatchResponse;
 import com.geekmelon.backend.dto.AdminFeedDetailResponse;
 import com.geekmelon.backend.dto.AdminFeedListItemResponse;
 import com.geekmelon.backend.dto.AdminFeedUpdateRequest;
@@ -18,7 +19,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -160,6 +161,7 @@ public class AdminFeedService {
         if (request.getAdminNote() != null) {
             entity.setAdminNote(trimToNull(request.getAdminNote()));
         }
+
         entity.setAdminUpdatedAt(now);
         entity.setUpdatedAt(now);
 
@@ -182,9 +184,107 @@ public class AdminFeedService {
         return update(id, request);
     }
 
+    @Transactional
+    public AdminFeedBatchResponse batchUpdate(List<Long> ids, String action) {
+        if (ids == null || ids.isEmpty()) {
+            throw new BizException(400, "请至少选择一条内容");
+        }
+
+        String normalizedAction = action == null ? "" : action.trim().toLowerCase();
+        if (!List.of("hide", "restore", "feature", "unfeature").contains(normalizedAction)) {
+            throw new BizException(400, "暂不支持该批量动作");
+        }
+
+        LinkedHashSet<Long> uniqueIds = ids.stream()
+                .filter(Objects::nonNull)
+                .collect(LinkedHashSet::new, Set::add, Set::addAll);
+        if (uniqueIds.isEmpty()) {
+            throw new BizException(400, "请至少选择一条有效内容");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        int nextFeaturedRank = resolveNextFeaturedRank();
+        int successCount = 0;
+        List<Long> affectedIds = new ArrayList<>();
+
+        for (Long id : uniqueIds) {
+            AiNewsFeed entity = aiNewsFeedRepository.findById(id).orElse(null);
+            if (entity == null) {
+                continue;
+            }
+
+            boolean changed = switch (normalizedAction) {
+                case "hide" -> updateStatusForBatch(entity, "hidden", now);
+                case "restore" -> updateStatusForBatch(entity, "active", now);
+                case "feature" -> updateFeaturedForBatch(entity, true, now, nextFeaturedRank);
+                case "unfeature" -> updateFeaturedForBatch(entity, false, now, nextFeaturedRank);
+                default -> false;
+            };
+
+            if (!changed) {
+                continue;
+            }
+
+            if ("feature".equals(normalizedAction) && entity.getAdminFeaturedRank() != null) {
+                nextFeaturedRank = Math.max(nextFeaturedRank, entity.getAdminFeaturedRank() + 1);
+            }
+            aiNewsFeedRepository.save(entity);
+            successCount += 1;
+            affectedIds.add(entity.getId());
+        }
+
+        return new AdminFeedBatchResponse(
+                normalizedAction,
+                uniqueIds.size(),
+                successCount,
+                uniqueIds.size() - successCount,
+                affectedIds
+        );
+    }
+
     private AiNewsFeed getRequiredFeed(Long id) {
         return aiNewsFeedRepository.findById(id)
                 .orElseThrow(() -> new BizException(404, "内容不存在"));
+    }
+
+    private boolean updateStatusForBatch(AiNewsFeed entity, String targetStatus, LocalDateTime now) {
+        if (Objects.equals(entity.getStatus(), targetStatus)) {
+            return false;
+        }
+        entity.setStatus(targetStatus);
+        entity.setAdminUpdatedAt(now);
+        entity.setUpdatedAt(now);
+        return true;
+    }
+
+    private boolean updateFeaturedForBatch(AiNewsFeed entity, boolean targetFeatured, LocalDateTime now, int nextFeaturedRank) {
+        boolean currentFeatured = Boolean.TRUE.equals(entity.getAdminFeatured());
+        if (currentFeatured == targetFeatured && (targetFeatured || entity.getAdminFeaturedRank() == null)) {
+            return false;
+        }
+
+        entity.setAdminFeatured(targetFeatured);
+        if (targetFeatured) {
+            entity.setAdminFeaturedRank(
+                    entity.getAdminFeaturedRank() == null || entity.getAdminFeaturedRank() < 1
+                            ? nextFeaturedRank
+                            : entity.getAdminFeaturedRank()
+            );
+        } else {
+            entity.setAdminFeaturedRank(null);
+        }
+        entity.setAdminUpdatedAt(now);
+        entity.setUpdatedAt(now);
+        return true;
+    }
+
+    private int resolveNextFeaturedRank() {
+        return aiNewsFeedRepository.findAllByAdminFeaturedTrueAndStatusOrderByAdminFeaturedRankAscAdminUpdatedAtDesc("active")
+                .stream()
+                .map(AiNewsFeed::getAdminFeaturedRank)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0) + 1;
     }
 
     private LocalDateTime sortByAdminUpdatedAt(AiNewsFeed entity) {

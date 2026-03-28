@@ -1,7 +1,24 @@
 import { computed, readonly, shallowRef, watch } from 'vue'
-import type { ApiResponse, FeedRecord } from '@/features/feed/types'
+import type { ApiResponse, FeedPageResult, FeedRecord } from '@/features/feed/types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
+
+function formatDateLabel(dateValue: string | null | undefined, fallbackText: string) {
+  if (!dateValue) {
+    return fallbackText
+  }
+
+  const parsed = new Date(`${dateValue}T00:00:00+08:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return fallbackText
+  }
+
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  }).format(parsed)
+}
 
 function buildYesterdayLabel() {
   const now = new Date()
@@ -48,8 +65,14 @@ export function useFeedQuery() {
   const errorMessage = shallowRef('')
   const sort = shallowRef<'latest' | 'spicy'>('latest')
   const dateScope = shallowRef<'yesterday'>('yesterday')
+  const effectiveDateScope = shallowRef<'yesterday' | 'fallback'>('yesterday')
+  const effectiveDate = shallowRef<string | null>(null)
+  const emptyFallback = shallowRef(false)
 
   const yesterdayLabel = computed(() => buildYesterdayLabel())
+  const effectiveDateLabel = computed(() =>
+    formatDateLabel(effectiveDate.value, yesterdayLabel.value),
+  )
 
   const sortedRecords = computed(() => sortRecordsLocally(allRecords.value, sort.value))
   const total = computed(() => sortedRecords.value.length)
@@ -78,19 +101,22 @@ export function useFeedQuery() {
 
     try {
       const response = await fetch(`${API_BASE_URL}/feeds?${params.toString()}`)
-      const payload = (await response.json()) as ApiResponse<{
-        records: FeedRecord[]
-        total: number
-      }>
+      const payload = (await response.json()) as ApiResponse<FeedPageResult>
       if (!response.ok || payload.code !== 0) {
         throw new Error(payload.message || '列表加载失败')
       }
 
       allRecords.value = payload.data.records
+      effectiveDateScope.value = payload.data.effectiveDateScope ?? 'yesterday'
+      effectiveDate.value = payload.data.effectiveDate ?? null
+      emptyFallback.value = Boolean(payload.data.emptyFallback)
       page.value = 1
     } catch (error) {
       errorMessage.value = error instanceof Error ? error.message : '列表加载失败'
       allRecords.value = []
+      effectiveDateScope.value = 'yesterday'
+      effectiveDate.value = null
+      emptyFallback.value = false
       page.value = 1
     } finally {
       loading.value = false
@@ -139,6 +165,10 @@ export function useFeedQuery() {
     sort: readonly(sort),
     dateScope: readonly(dateScope),
     yesterdayLabel,
+    effectiveDateScope: readonly(effectiveDateScope),
+    effectiveDate: readonly(effectiveDate),
+    effectiveDateLabel,
+    emptyFallback: readonly(emptyFallback),
     fetchFeeds,
     updateFilters,
     nextPage,

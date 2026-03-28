@@ -1,8 +1,11 @@
 package com.geekmelon.backend.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.geekmelon.backend.config.GeekMelonProperties;
+import com.geekmelon.backend.dto.AdminTaskPreviewItemResponse;
+import com.geekmelon.backend.dto.AdminTaskPreviewResponse;
 import com.geekmelon.backend.dto.AdminTaskRunLogResponse;
 import com.geekmelon.backend.entity.AdminSourceConfig;
 import com.geekmelon.backend.entity.AdminTaskRunLog;
@@ -19,6 +22,7 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -59,17 +63,22 @@ public class AdminTaskService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<AdminTaskRunLogResponse> listRecentRuns(int limit) {
+        return adminTaskRunLogRepository.findTop20ByOrderByStartedAtDescIdDesc()
+                .stream()
+                .limit(limit)
+                .map(this::toResponse)
+                .toList();
+    }
+
     public AdminTaskRunLogResponse triggerManualCollect(String sourceKey) {
         AdminSourceConfig sourceConfig = adminSourceService.getRequiredSource(sourceKey);
         if (!Boolean.TRUE.equals(sourceConfig.getEnabled())) {
             throw new BizException(400, "该来源已禁用，无法手动抓取");
         }
 
-        AdminSourceCatalog.ManagedSourceDefinition definition = AdminSourceCatalog.find(sourceKey);
-        if (definition == null) {
-            throw new BizException(404, "来源不存在");
-        }
-
+        AdminSourceCatalog.ManagedSourceDefinition definition = getRequiredDefinition(sourceKey);
         if (!RUNNING.compareAndSet(false, true)) {
             throw new BizException(400, "当前已有抓取任务在运行，请稍后再试");
         }
@@ -88,12 +97,9 @@ public class AdminTaskService {
         log = adminTaskRunLogRepository.save(log);
 
         try {
-            ProcessBuilder processBuilder = buildCrawlerProcess(definition.commandSource());
+            ProcessBuilder processBuilder = buildCrawlerProcess(definition.commandSource(), false);
             processBuilder.redirectErrorStream(true);
-            processBuilder.environment().put("PYTHONIOENCODING", "UTF-8");
-            processBuilder.environment().put("GM_INGEST_TOKEN", resolveIngestToken());
-            processBuilder.environment().put("GM_API_BASE_URL", resolveCrawlerApiBaseUrl());
-            processBuilder.environment().put("GM_RUN_ID", runId);
+            applyBaseEnvironment(processBuilder, runId);
             applyEditorialEnvironment(processBuilder);
             applySourceEnvironment(processBuilder, sourceConfig);
 
@@ -108,7 +114,6 @@ public class AdminTaskService {
             log.setSkippedCount(summary.skippedCount());
             log.setFilteredCount(summary.filteredCount());
             log.setStatus(exitCode == 0 ? "success" : "failed");
-
             if (exitCode != 0) {
                 log.setErrorCategory(summary.errorCategory() != null ? summary.errorCategory() : ERROR_PROCESS_EXIT);
                 log.setErrorDetail(limitText(
@@ -138,13 +143,51 @@ public class AdminTaskService {
         }
     }
 
-    @Transactional(readOnly = true)
-    public List<AdminTaskRunLogResponse> listRecentRuns(int limit) {
-        return adminTaskRunLogRepository.findTop20ByOrderByStartedAtDescIdDesc()
-                .stream()
-                .limit(limit)
-                .map(this::toResponse)
-                .toList();
+    public AdminTaskPreviewResponse previewSource(String sourceKey) {
+        AdminSourceCatalog.ManagedSourceDefinition definition = getRequiredDefinition(sourceKey);
+        AdminSourceConfig sourceConfig = adminSourceService.getRequiredSource(sourceKey);
+
+        String runId = UUID.randomUUID().toString();
+        try {
+            ProcessBuilder processBuilder = buildCrawlerProcess(definition.commandSource(), true);
+            processBuilder.redirectErrorStream(true);
+            applyBaseEnvironment(processBuilder, runId);
+            applySourceEnvironment(processBuilder, sourceConfig);
+            processBuilder.environment().put("GM_ENABLE_DEEPSEEK", "false");
+
+            Process process = processBuilder.start();
+            List<String> outputLines = readOutput(process);
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                TaskRunSummary summary = summarize(outputLines);
+                throw new BizException(
+                        500,
+                        summary.errorDetail() != null ? summary.errorDetail() : "预览抓取失败"
+                );
+            }
+
+            PreviewSummary preview = summarizePreview(outputLines, sourceKey, runId);
+            return new AdminTaskPreviewResponse(
+                    preview.sourceKey(),
+                    preview.runId(),
+                    preview.previewCount(),
+                    preview.filteredCount(),
+                    preview.items()
+            );
+        } catch (IOException exception) {
+            throw new BizException(500, "预览抓取失败：" + exception.getMessage());
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new BizException(500, "预览抓取被中断");
+        }
+    }
+
+    private AdminSourceCatalog.ManagedSourceDefinition getRequiredDefinition(String sourceKey) {
+        AdminSourceCatalog.ManagedSourceDefinition definition = AdminSourceCatalog.find(sourceKey);
+        if (definition == null) {
+            throw new BizException(404, "来源不存在");
+        }
+        return definition;
     }
 
     private String resolvePythonCommand() {
@@ -178,6 +221,13 @@ public class AdminTaskService {
             return "geekmelon-dev-token";
         }
         return properties.ingest().token();
+    }
+
+    private void applyBaseEnvironment(ProcessBuilder processBuilder, String runId) {
+        processBuilder.environment().put("PYTHONIOENCODING", "UTF-8");
+        processBuilder.environment().put("GM_INGEST_TOKEN", resolveIngestToken());
+        processBuilder.environment().put("GM_API_BASE_URL", resolveCrawlerApiBaseUrl());
+        processBuilder.environment().put("GM_RUN_ID", runId);
     }
 
     private void applyEditorialEnvironment(ProcessBuilder processBuilder) {
@@ -224,26 +274,28 @@ public class AdminTaskService {
         }
     }
 
-    private ProcessBuilder buildCrawlerProcess(String commandSource) {
+    private ProcessBuilder buildCrawlerProcess(String commandSource, boolean previewMode) {
         String runnerMode = resolveCrawlerRunnerMode();
+        List<String> command = new ArrayList<>();
+        command.add(resolvePythonCommand());
+
         if ("embedded".equals(runnerMode)) {
-            ProcessBuilder processBuilder = new ProcessBuilder(
-                    resolvePythonCommand(),
-                    "/app/crawler/main.py",
-                    "--source",
-                    commandSource
-            );
-            processBuilder.directory(Path.of("/app/crawler").toFile());
-            return processBuilder;
+            command.add("/app/crawler/main.py");
+        } else {
+            command.add("main.py");
+        }
+        command.add("--source");
+        command.add(commandSource);
+        if (previewMode) {
+            command.add("--preview");
         }
 
-        ProcessBuilder processBuilder = new ProcessBuilder(
-                resolvePythonCommand(),
-                "main.py",
-                "--source",
-                commandSource
-        );
-        processBuilder.directory(resolveCrawlerWorkingDirectory().toFile());
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
+        if ("embedded".equals(runnerMode)) {
+            processBuilder.directory(Path.of("/app/crawler").toFile());
+        } else {
+            processBuilder.directory(resolveCrawlerWorkingDirectory().toFile());
+        }
         return processBuilder;
     }
 
@@ -301,30 +353,61 @@ public class AdminTaskService {
         return new TaskRunSummary(created, updated, skipped, filtered, errorCategory, errorDetail);
     }
 
+    private PreviewSummary summarizePreview(List<String> outputLines, String sourceKey, String defaultRunId) {
+        String runId = defaultRunId;
+        int previewCount = 0;
+        int filteredCount = 0;
+        List<AdminTaskPreviewItemResponse> items = List.of();
+
+        for (String line : outputLines) {
+            JsonNode root = parseJson(line);
+            if (root == null || !"preview_result".equals(textValue(root, "event"))) {
+                continue;
+            }
+
+            runId = textValue(root, "run_id") != null ? textValue(root, "run_id") : runId;
+            previewCount = root.path("preview_count").asInt(0);
+            filteredCount = root.path("filtered_count").asInt(0);
+            if (root.has("items") && root.get("items").isArray()) {
+                items = objectMapper.convertValue(
+                        root.get("items"),
+                        new TypeReference<List<AdminTaskPreviewItemResponse>>() {
+                        }
+                );
+            }
+        }
+
+        return new PreviewSummary(sourceKey, runId, previewCount, filteredCount, items);
+    }
+
     private StructuredLogEvent parseStructuredEvent(String line) {
-        if (line == null || line.isBlank()) {
+        JsonNode root = parseJson(line);
+        if (root == null || !root.isObject()) {
             return null;
         }
 
+        String event = textValue(root, "event");
+        if (event == null) {
+            return null;
+        }
+
+        int count = root.path("count").canConvertToInt() ? Math.max(1, root.path("count").asInt()) : 1;
+        return new StructuredLogEvent(
+                event,
+                textValue(root, "action"),
+                count,
+                textValue(root, "error_category"),
+                textValue(root, "message")
+        );
+    }
+
+    private JsonNode parseJson(String line) {
+        if (line == null || line.isBlank()) {
+            return null;
+        }
         try {
             JsonNode root = objectMapper.readTree(line);
-            if (!root.isObject()) {
-                return null;
-            }
-
-            String event = textValue(root, "event");
-            if (event == null) {
-                return null;
-            }
-
-            int count = root.path("count").canConvertToInt() ? Math.max(1, root.path("count").asInt()) : 1;
-            return new StructuredLogEvent(
-                    event,
-                    textValue(root, "action"),
-                    count,
-                    textValue(root, "error_category"),
-                    textValue(root, "message")
-            );
+            return root.isObject() ? root : null;
         } catch (IOException exception) {
             return null;
         }
@@ -370,6 +453,15 @@ public class AdminTaskService {
             int filteredCount,
             String errorCategory,
             String errorDetail
+    ) {
+    }
+
+    private record PreviewSummary(
+            String sourceKey,
+            String runId,
+            int previewCount,
+            int filteredCount,
+            List<AdminTaskPreviewItemResponse> items
     ) {
     }
 

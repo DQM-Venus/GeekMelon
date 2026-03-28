@@ -72,4 +72,49 @@ class AdminAuthAndFeedIntegrationTest extends BackendIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.records[0].displaySummary").value("edited summary"))
                 .andExpect(jsonPath("$.data.records[0].spicyIndex").value(9));
     }
+
+    @Test
+    void shouldBatchHideAndFeatureFeeds() throws Exception {
+        var first = saveFeed("cls", "batch-1", "batch first", yesterdayAt(9, 0), yesterdayAt(9, 0));
+        var second = saveFeed("kr36", "batch-2", "batch second", yesterdayAt(10, 0), yesterdayAt(10, 0));
+        MockHttpSession session = loginAsAdmin();
+
+        mockMvc.perform(post("/api/admin/feeds/batch")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ids": [%d, %d],
+                                  "action": "feature"
+                                }
+                                """.formatted(first.getId(), second.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.successCount").value(2));
+
+        mockMvc.perform(get("/api/feeds")
+                        .param("page", "1")
+                        .param("page_size", "10")
+                        .param("date_scope", "yesterday"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].adminFeatured").value(true));
+
+        mockMvc.perform(post("/api/admin/feeds/batch")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ids": [%d, %d],
+                                  "action": "hide"
+                                }
+                                """.formatted(first.getId(), second.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.successCount").value(2));
+
+        mockMvc.perform(get("/api/feeds")
+                        .param("page", "1")
+                        .param("page_size", "10")
+                        .param("date_scope", "yesterday"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+    }
 }

@@ -1,19 +1,24 @@
 <script setup lang="ts">
-const props = defineProps<{
+defineProps<{
   dateLabel: string
+  effectiveDate?: string | null
+  emptyFallback?: boolean
 }>()
 </script>
 
 <template>
   <section class="feed-hero gm-section-card gm-noise">
     <div class="feed-hero__copy gm-stagger-enter">
-      <p class="feed-hero__eyebrow gm-mono">昨日情报流 / GEEK MELON DOSSIER</p>
+      <p class="feed-hero__eyebrow">昨日情报流 / GEEK MELON DOSSIER</p>
       <div class="feed-hero__headline-row">
         <h1 class="feed-hero__title">Geek Melon</h1>
-        <span class="feed-hero__date-pill">{{ props.dateLabel }}</span>
+        <span class="feed-hero__date-pill">{{ dateLabel }}</span>
       </div>
       <p class="feed-hero__summary">
-        昨天的 AI 圈新鲜事，留给开发者摸鱼时一口看完。
+        {{ emptyFallback ? '昨天暂无公开内容，当前展示最近一期值得一看的 AI 情报。' : '昨天的 AI 圈新鲜事，留给开发者摸鱼时一口看完。' }}
+      </p>
+      <p v-if="emptyFallback && effectiveDate" class="feed-hero__fallback">
+        当前展示日期：{{ effectiveDate }}
       </p>
     </div>
   </section>
@@ -81,12 +86,18 @@ const props = defineProps<{
   font-size: 0.78rem;
 }
 
-.feed-hero__summary {
-  max-width: 560px;
+.feed-hero__summary,
+.feed-hero__fallback {
   margin: 0;
+  max-width: 640px;
   color: var(--gm-muted);
   font-size: 1rem;
   line-height: 1.75;
+}
+
+.feed-hero__fallback {
+  color: var(--gm-melon-deep);
+  font-size: 0.88rem;
 }
 
 @media (max-width: 640px) {

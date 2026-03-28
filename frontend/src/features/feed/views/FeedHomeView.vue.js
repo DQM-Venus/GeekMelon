@@ -5,7 +5,7 @@ import FeedToolbar from '@/features/feed/components/FeedToolbar.vue';
 import { useFeedDetail } from '@/features/feed/composables/useFeedDetail';
 import { useFeedQuery } from '@/features/feed/composables/useFeedQuery';
 import { useThemePreference } from '@/composables/useThemePreference';
-const { records, page, totalPages, loading, errorMessage, sort, yesterdayLabel, updateFilters, nextPage, prevPage, } = useFeedQuery();
+const { records, page, totalPages, loading, errorMessage, sort, effectiveDateLabel, effectiveDate, emptyFallback, updateFilters, nextPage, prevPage, } = useFeedQuery();
 const { currentTheme, setTheme } = useThemePreference();
 const { detail, loading: detailLoading, errorMessage: detailErrorMessage, open: detailOpen, openDetail, closeDetail, } = useFeedDetail();
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
@@ -20,10 +20,14 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.main, __VLS_intrinsicElements.
 /** @type {[typeof FeedHero, ]} */ ;
 // @ts-ignore
 const __VLS_0 = __VLS_asFunctionalComponent(FeedHero, new FeedHero({
-    dateLabel: (__VLS_ctx.yesterdayLabel),
+    dateLabel: (__VLS_ctx.effectiveDateLabel),
+    emptyFallback: (__VLS_ctx.emptyFallback),
+    effectiveDate: (__VLS_ctx.effectiveDate),
 }));
 const __VLS_1 = __VLS_0({
-    dateLabel: (__VLS_ctx.yesterdayLabel),
+    dateLabel: (__VLS_ctx.effectiveDateLabel),
+    emptyFallback: (__VLS_ctx.emptyFallback),
+    effectiveDate: (__VLS_ctx.effectiveDate),
 }, ...__VLS_functionalComponentArgsRest(__VLS_0));
 /** @type {[typeof FeedToolbar, ]} */ ;
 // @ts-ignore
@@ -62,6 +66,8 @@ const __VLS_11 = __VLS_asFunctionalComponent(FeedList, new FeedList({
     errorMessage: (__VLS_ctx.errorMessage),
     page: (__VLS_ctx.page),
     totalPages: (__VLS_ctx.totalPages),
+    effectiveDate: (__VLS_ctx.effectiveDate),
+    emptyFallback: (__VLS_ctx.emptyFallback),
 }));
 const __VLS_12 = __VLS_11({
     ...{ 'onPrev': {} },
@@ -72,6 +78,8 @@ const __VLS_12 = __VLS_11({
     errorMessage: (__VLS_ctx.errorMessage),
     page: (__VLS_ctx.page),
     totalPages: (__VLS_ctx.totalPages),
+    effectiveDate: (__VLS_ctx.effectiveDate),
+    emptyFallback: (__VLS_ctx.emptyFallback),
 }, ...__VLS_functionalComponentArgsRest(__VLS_11));
 let __VLS_14;
 let __VLS_15;
@@ -130,7 +138,9 @@ const __VLS_self = (await import('vue')).defineComponent({
             loading: loading,
             errorMessage: errorMessage,
             sort: sort,
-            yesterdayLabel: yesterdayLabel,
+            effectiveDateLabel: effectiveDateLabel,
+            effectiveDate: effectiveDate,
+            emptyFallback: emptyFallback,
             updateFilters: updateFilters,
             nextPage: nextPage,
             prevPage: prevPage,

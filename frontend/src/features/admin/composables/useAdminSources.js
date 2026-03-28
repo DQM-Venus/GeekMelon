@@ -28,12 +28,18 @@ export function useAdminSources() {
     }
     async function saveSource(sourceKey, payload) {
         saving.value = true;
+        errorMessage.value = '';
         try {
             const updated = await adminFetch(`/admin/sources/${sourceKey}`, {
                 method: 'PATCH',
                 body: JSON.stringify(payload),
             });
             sources.value = sources.value.map((item) => (item.sourceKey === sourceKey ? updated : item));
+            return updated;
+        }
+        catch (error) {
+            errorMessage.value = error instanceof Error ? error.message : '保存来源配置失败';
+            throw error;
         }
         finally {
             saving.value = false;
@@ -41,6 +47,7 @@ export function useAdminSources() {
     }
     async function runCollect(sourceKey) {
         saving.value = true;
+        errorMessage.value = '';
         try {
             const log = await adminFetch('/admin/tasks/collect', {
                 method: 'POST',
@@ -48,6 +55,27 @@ export function useAdminSources() {
             });
             runs.value = [log, ...runs.value.filter((item) => item.id !== log.id)].slice(0, 20);
             return log;
+        }
+        catch (error) {
+            errorMessage.value = error instanceof Error ? error.message : '手动抓取失败';
+            throw error;
+        }
+        finally {
+            saving.value = false;
+        }
+    }
+    async function previewSource(sourceKey) {
+        saving.value = true;
+        errorMessage.value = '';
+        try {
+            return await adminFetch('/admin/tasks/preview', {
+                method: 'POST',
+                body: JSON.stringify({ sourceKey }),
+            });
+        }
+        catch (error) {
+            errorMessage.value = error instanceof Error ? error.message : '预览抓取失败';
+            throw error;
         }
         finally {
             saving.value = false;
@@ -62,5 +90,6 @@ export function useAdminSources() {
         fetchSources,
         saveSource,
         runCollect,
+        previewSource,
     };
 }

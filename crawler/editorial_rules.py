@@ -270,6 +270,46 @@ USER_IMPACT_KEYWORDS = [
     "\u53ef\u7528",
 ]
 
+AIBASE_MARKETING_KEYWORDS = [
+    "\u4e00\u7ad9\u5f0f",
+    "\u5168\u5e73\u53f0",
+    "\u805a\u5408",
+    "\u5bfc\u822a",
+    "\u5165\u53e3",
+    "\u6700\u5168",
+    "\u5fc5\u770b",
+    "\u4fdd\u59c6\u7ea7",
+    "\u5feb\u901f\u4e0a\u624b",
+    "\u8d85\u5168",
+    "\u76d8\u70b9",
+    "\u5408\u96c6",
+]
+
+ZHIDX_EDITORIAL_KEYWORDS = [
+    "\u4e13\u9898",
+    "\u590d\u76d8",
+    "\u6df1\u5ea6",
+    "\u89c2\u5bdf",
+    "\u8d8b\u52bf",
+    "\u884c\u4e1a\u590d\u76d8",
+    "\u884c\u4e1a\u89c2\u5bdf",
+    "\u91cd\u78c5",
+]
+
+JUEJIN_TUTORIAL_KEYWORDS = [
+    "\u6559\u7a0b",
+    "\u5b9e\u6218",
+    "\u5165\u95e8",
+    "\u624b\u628a\u624b",
+    "\u8f6c\u578b\u4e4b\u8def",
+    "\u6210\u957f",
+    "\u5fc3\u5f97",
+    "\u9762\u7ecf",
+    "\u6821\u62db",
+    "\u516b\u80a1",
+    "\u7ecf\u9a8c\u5206\u4eab",
+]
+
 LOW_SIGNAL_FINANCE_KEYWORDS = [
     "\u878d\u8d44",
     "ipo",
@@ -824,3 +864,85 @@ def contains_ai_or_tech_signal(title: str, content: str) -> bool:
         "\u5e94\u7528",
     ]
     return any(keyword in text for keyword in signal_keywords)
+
+
+def has_concrete_event_anchor(title: str, content: str) -> bool:
+    text = _lower_text(title, content)
+    has_event_signal = any(keyword in text for keyword in EVENT_SIGNAL_KEYWORDS)
+    has_brand = any(keyword in text for keyword in BRAND_KEYWORDS)
+    has_people = any(keyword in text for keyword in PEOPLE_SIGNAL_KEYWORDS)
+    has_product = any(keyword in text for keyword in PRODUCT_SIGNAL_KEYWORDS)
+    has_user_impact = any(keyword in text for keyword in USER_IMPACT_KEYWORDS)
+    return (has_event_signal and has_brand) or has_people or has_product or has_user_impact
+
+
+def should_drop_by_source_context(source_key: str, title: str, content: str) -> bool:
+    text = _lower_text(title, content)
+    has_event_anchor = has_concrete_event_anchor(title, content)
+    generic_score = generic_industry_score(title, content)
+    editorial_score_value = editorial_score(title, content)
+
+    if source_key == "aibase":
+        has_marketing_tone = any(keyword in text for keyword in AIBASE_MARKETING_KEYWORDS)
+        has_soft_product_pitch = any(
+            keyword in text
+            for keyword in ["\u5e73\u53f0\u805a\u5408", "\u63a5\u5165\u591a\u5c11\u6a21\u578b", "\u4e00\u952e\u4f53\u9a8c", "\u5de5\u5177\u96c6"]
+        )
+        has_model_hub_pitch = "ai" in text and ("\u6a21\u578b" in text or "model" in text) and (
+            "\u5165\u53e3" in text or "\u5bfc\u822a" in text or "hub" in text
+        )
+        return (has_marketing_tone or has_soft_product_pitch or has_model_hub_pitch) and not has_event_anchor
+
+    if source_key == "zhidx":
+        has_editorial_tone = any(keyword in text for keyword in ZHIDX_EDITORIAL_KEYWORDS)
+        return (has_editorial_tone or editorial_score_value >= 2 or generic_score >= 4) and not has_event_anchor
+
+    if source_key == "juejin":
+        has_tutorial_tone = any(keyword in text for keyword in JUEJIN_TUTORIAL_KEYWORDS + DRY_TECH_KEYWORDS)
+        has_controversy = any(keyword in text for keyword in GOSSIP_KEYWORDS)
+        return has_tutorial_tone and not has_controversy
+
+    if source_key in {"cls", "kr36"}:
+        has_finance_metrics = any(keyword in text for keyword in FINANCE_METRIC_KEYWORDS + LOW_SIGNAL_FINANCE_KEYWORDS) or (
+            bool(re.search(r"(\$|usd|billion|million|\d)", text))
+            and any(keyword in text for keyword in ["sales", "revenue", "utilization", "\u9500\u552e", "\u8425\u6536", "\u4ea7\u80fd"])
+        )
+        has_policy_tone = official_tone_score(title, content) >= 3
+        return (has_finance_metrics or has_policy_tone or generic_score >= 5) and not has_event_anchor
+
+    return False
+
+
+def apply_source_specific_penalty(source_key: str, title: str, content: str) -> int:
+    text = _lower_text(title, content)
+    has_event_anchor = has_concrete_event_anchor(title, content)
+
+    if source_key == "aibase":
+        if any(keyword in text for keyword in AIBASE_MARKETING_KEYWORDS) or (
+            "ai" in text and ("\u5165\u53e3" in text or "\u5bfc\u822a" in text or "all-in-one" in text or "entry" in text)
+        ):
+            return 3 if not has_event_anchor else 1
+        return 0
+
+    if source_key == "zhidx":
+        if any(keyword in text for keyword in ZHIDX_EDITORIAL_KEYWORDS):
+            return 3 if not has_event_anchor else 1
+        if generic_industry_score(title, content) >= 3:
+            return 2
+        return 0
+
+    if source_key == "juejin":
+        if any(keyword in text for keyword in ["\u5fc3\u5f97", "\u8f6c\u578b", "\u7ecf\u9a8c", "\u5206\u4eab"]):
+            return 2
+        return 0
+
+    if source_key in {"cls", "kr36"}:
+        if any(keyword in text for keyword in FINANCE_METRIC_KEYWORDS) or any(
+            keyword in text for keyword in ["sales", "revenue", "utilization"]
+        ):
+            return 3
+        if generic_industry_score(title, content) >= 3:
+            return 2
+        return 0
+
+    return 0

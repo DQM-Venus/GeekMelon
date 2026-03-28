@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import asdict
 
 import requests
 
 from analyzers.deepseek_analyzer import DeepSeekAnalyzer
 from analyzers.rule_based_analyzer import RuleBasedAnalyzer
+from analyzers.rule_evaluator import evaluate_rule_based_item
 from app_config import load_config
 from publish_window import filter_items_for_yesterday
 from publisher import FeedPublisher
@@ -53,6 +55,11 @@ def parse_args() -> argparse.Namespace:
         ],
         default=None,
         help="指定本次运行使用的数据源",
+    )
+    parser.add_argument(
+        "--preview",
+        action="store_true",
+        help="仅执行候选构建和规则过滤，不执行入库推送",
     )
     return parser.parse_args()
 
@@ -109,9 +116,9 @@ def build_analyzer(config):
     return RuleBasedAnalyzer()
 
 
-def apply_publish_window(source_name: str, items: list) -> list:
+def apply_publish_window(source_name: str, items: list) -> tuple[list, int]:
     if source_name not in DATE_FILTERED_SOURCES:
-        return items
+        return items, 0
 
     filtered_items = filter_items_for_yesterday(items)
     filtered_count = max(0, len(items) - len(filtered_items))
@@ -123,7 +130,7 @@ def apply_publish_window(source_name: str, items: list) -> list:
             count=filtered_count,
             message="发布时间不在昨天窗口内，已跳过。",
         )
-    return filtered_items
+    return filtered_items, filtered_count
 
 
 def extract_publish_action(response: requests.Response) -> str | None:
@@ -150,6 +157,45 @@ def summarize_response_detail(response: requests.Response) -> str:
     return response.text[:500]
 
 
+def build_preview_items(items: list) -> tuple[list[dict], int]:
+    preview_items: list[dict] = []
+    filtered_count = 0
+
+    for item in items:
+        evaluation = evaluate_rule_based_item(item)
+        if evaluation.decision == "drop":
+            filtered_count += 1
+            preview_items.append(
+                {
+                    "title": item.title,
+                    "sourceUrl": item.source_url,
+                    "rawPublishTime": item.raw_publish_time,
+                    "category": item.category,
+                    "spicyIndex": item.spicy_index,
+                    "decision": "drop",
+                    "highlight": item.highlight,
+                    "summary": item.summary,
+                }
+            )
+            continue
+
+        preview_item = evaluation.item
+        preview_items.append(
+            {
+                "title": preview_item.title,
+                "sourceUrl": preview_item.source_url,
+                "rawPublishTime": preview_item.raw_publish_time,
+                "category": preview_item.category,
+                "spicyIndex": preview_item.spicy_index,
+                "decision": "keep",
+                "highlight": preview_item.highlight,
+                "summary": preview_item.summary,
+            }
+        )
+
+    return preview_items, filtered_count
+
+
 def main() -> int:
     args = parse_args()
     config = load_config()
@@ -162,6 +208,7 @@ def main() -> int:
         level="info",
         run_id=current_run_id(),
         source=source_name,
+        preview=args.preview,
         message="开始执行抓取任务。",
     )
 
@@ -204,7 +251,7 @@ def main() -> int:
         return 0
 
     try:
-        items = apply_publish_window(source_name, items)
+        items, window_filtered_count = apply_publish_window(source_name, items)
     except Exception as error:
         emit_log(
             "error",
@@ -214,6 +261,19 @@ def main() -> int:
             message=f"发布时间窗口过滤失败：{error}",
         )
         return 1
+
+    if args.preview:
+        preview_items, preview_filtered_count = build_preview_items(items)
+        emit_log(
+            "preview_result",
+            level="info",
+            source=source_name,
+            preview_count=len(preview_items),
+            filtered_count=preview_filtered_count + window_filtered_count,
+            items=preview_items,
+            message="预览抓取完成。",
+        )
+        return 0
 
     if not items:
         emit_log(

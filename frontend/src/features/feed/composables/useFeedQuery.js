@@ -1,5 +1,19 @@
 import { computed, readonly, shallowRef, watch } from 'vue';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
+function formatDateLabel(dateValue, fallbackText) {
+    if (!dateValue) {
+        return fallbackText;
+    }
+    const parsed = new Date(`${dateValue}T00:00:00+08:00`);
+    if (Number.isNaN(parsed.getTime())) {
+        return fallbackText;
+    }
+    return new Intl.DateTimeFormat('zh-CN', {
+        month: 'long',
+        day: 'numeric',
+        weekday: 'short',
+    }).format(parsed);
+}
 function buildYesterdayLabel() {
     const now = new Date();
     const yesterday = new Date(now);
@@ -39,7 +53,11 @@ export function useFeedQuery() {
     const errorMessage = shallowRef('');
     const sort = shallowRef('latest');
     const dateScope = shallowRef('yesterday');
+    const effectiveDateScope = shallowRef('yesterday');
+    const effectiveDate = shallowRef(null);
+    const emptyFallback = shallowRef(false);
     const yesterdayLabel = computed(() => buildYesterdayLabel());
+    const effectiveDateLabel = computed(() => formatDateLabel(effectiveDate.value, yesterdayLabel.value));
     const sortedRecords = computed(() => sortRecordsLocally(allRecords.value, sort.value));
     const total = computed(() => sortedRecords.value.length);
     const totalPages = computed(() => {
@@ -69,11 +87,17 @@ export function useFeedQuery() {
                 throw new Error(payload.message || '列表加载失败');
             }
             allRecords.value = payload.data.records;
+            effectiveDateScope.value = payload.data.effectiveDateScope ?? 'yesterday';
+            effectiveDate.value = payload.data.effectiveDate ?? null;
+            emptyFallback.value = Boolean(payload.data.emptyFallback);
             page.value = 1;
         }
         catch (error) {
             errorMessage.value = error instanceof Error ? error.message : '列表加载失败';
             allRecords.value = [];
+            effectiveDateScope.value = 'yesterday';
+            effectiveDate.value = null;
+            emptyFallback.value = false;
             page.value = 1;
         }
         finally {
@@ -113,6 +137,10 @@ export function useFeedQuery() {
         sort: readonly(sort),
         dateScope: readonly(dateScope),
         yesterdayLabel,
+        effectiveDateScope: readonly(effectiveDateScope),
+        effectiveDate: readonly(effectiveDate),
+        effectiveDateLabel,
+        emptyFallback: readonly(emptyFallback),
         fetchFeeds,
         updateFilters,
         nextPage,

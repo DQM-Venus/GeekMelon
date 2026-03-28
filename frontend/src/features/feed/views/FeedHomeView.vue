@@ -14,7 +14,9 @@ const {
   loading,
   errorMessage,
   sort,
-  yesterdayLabel,
+  effectiveDateLabel,
+  effectiveDate,
+  emptyFallback,
   updateFilters,
   nextPage,
   prevPage,
@@ -34,7 +36,11 @@ const {
 
 <template>
   <main class="feed-home gm-page-shell">
-    <FeedHero :date-label="yesterdayLabel" />
+    <FeedHero
+      :date-label="effectiveDateLabel"
+      :empty-fallback="emptyFallback"
+      :effective-date="effectiveDate"
+    />
 
     <FeedToolbar
       :sort="sort"
@@ -49,6 +55,8 @@ const {
       :error-message="errorMessage"
       :page="page"
       :total-pages="totalPages"
+      :effective-date="effectiveDate"
+      :empty-fallback="emptyFallback"
       @prev="prevPage"
       @next="nextPage"
       @open-detail="openDetail"

@@ -1,8 +1,9 @@
-import { computed, onMounted, shallowRef } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import AdminFeedEditorDrawer from '@/features/admin/components/AdminFeedEditorDrawer.vue';
 import { useAdminFeeds } from '@/features/admin/composables/useAdminFeeds';
-const { records, total, page, totalPages, loading, saving, errorMessage, detail, detailLoading, detailErrorMessage, keyword, source, category, status, editorPick, featured, duplicateGroup, openDetail, saveDetail, hideFeed, restoreFeed, updateFilters, nextPage, prevPage, } = useAdminFeeds();
-const drawerOpen = shallowRef(false);
+const { records, total, page, totalPages, loading, saving, errorMessage, detail, detailLoading, detailErrorMessage, keyword, source, category, status, editorPick, featured, duplicateGroup, openDetail, saveDetail, hideFeed, restoreFeed, batchOperate, updateFilters, nextPage, prevPage, } = useAdminFeeds();
+const drawerOpen = ref(false);
+const selectedIds = ref([]);
 const sourceOptions = computed(() => Array.from(new Set(records.value.map((item) => item.source))).sort());
 const categoryOptions = computed(() => {
     const values = new Set();
@@ -16,8 +17,33 @@ const categoryOptions = computed(() => {
     }
     return Array.from(values).sort();
 });
+const selectedCount = computed(() => selectedIds.value.length);
+const allSelected = computed({
+    get: () => records.value.length > 0 && selectedIds.value.length === records.value.length,
+    set: (value) => {
+        selectedIds.value = value ? records.value.map((item) => item.id) : [];
+    },
+});
 function formatDateTime(value) {
     return value ? value.replace('T', ' ') : '-';
+}
+function toggleSelected(id, checked) {
+    if (checked) {
+        if (!selectedIds.value.includes(id)) {
+            selectedIds.value = [...selectedIds.value, id];
+        }
+        return;
+    }
+    selectedIds.value = selectedIds.value.filter((item) => item !== id);
+}
+function handleSelectAll(event) {
+    allSelected.value = event.target.checked;
+}
+function handleRowSelection(id, event) {
+    toggleSelected(id, event.target.checked);
+}
+function clearSelection() {
+    selectedIds.value = [];
 }
 function handleKeywordInput(event) {
     updateFilters({ keyword: event.target.value });
@@ -50,11 +76,15 @@ async function handleSave(payload) {
     }
     await saveDetail(detail.value.id, payload);
 }
-async function handleHide(id) {
-    await hideFeed(id);
-}
-async function handleRestore(id) {
-    await restoreFeed(id);
+async function runBatchAction(action) {
+    if (selectedIds.value.length === 0) {
+        return;
+    }
+    await batchOperate({
+        ids: selectedIds.value,
+        action,
+    });
+    clearSelection();
 }
 onMounted(() => {
     drawerOpen.value = false;
@@ -67,10 +97,14 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['admin-feed-filters__field']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-filters__field']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-filters__field']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-feed-batch']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-feed-batch']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-feed-batch__actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-table__status']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-table__status']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-filters']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-filters__field--keyword']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-feed-batch']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-filters']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-filters__field--keyword']} */ ;
 // CSS variable injection 
@@ -208,6 +242,60 @@ if (__VLS_ctx.errorMessage) {
     });
     (__VLS_ctx.errorMessage);
 }
+if (__VLS_ctx.selectedCount > 0) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+        ...{ class: "admin-feed-batch gm-section-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.selectedCount);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "admin-feed-batch__actions" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.selectedCount > 0))
+                    return;
+                __VLS_ctx.runBatchAction('hide');
+            } },
+        type: "button",
+        disabled: (__VLS_ctx.saving),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.selectedCount > 0))
+                    return;
+                __VLS_ctx.runBatchAction('restore');
+            } },
+        type: "button",
+        disabled: (__VLS_ctx.saving),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.selectedCount > 0))
+                    return;
+                __VLS_ctx.runBatchAction('feature');
+            } },
+        type: "button",
+        disabled: (__VLS_ctx.saving),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.selectedCount > 0))
+                    return;
+                __VLS_ctx.runBatchAction('unfeature');
+            } },
+        type: "button",
+        disabled: (__VLS_ctx.saving),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.clearSelection) },
+        type: "button",
+        ...{ class: "admin-feed-batch__ghost" },
+        disabled: (__VLS_ctx.saving),
+    });
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
     ...{ class: "admin-feed-table gm-section-card" },
 });
@@ -223,6 +311,14 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.table, __VLS_intrinsicElements.table)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.thead, __VLS_intrinsicElements.thead)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({
+    ...{ class: "admin-feed-table__checkbox" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    ...{ onChange: (__VLS_ctx.handleSelectAll) },
+    checked: (__VLS_ctx.allSelected),
+    type: "checkbox",
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.th, __VLS_intrinsicElements.th)({});
@@ -234,6 +330,16 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.tbody, __VLS_intrinsicElements
 for (const [item] of __VLS_getVForSourceType((__VLS_ctx.records))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({
         key: (item.id),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({
+        ...{ class: "admin-feed-table__checkbox" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        ...{ onChange: (...[$event]) => {
+                __VLS_ctx.handleRowSelection(item.id, $event);
+            } },
+        checked: (__VLS_ctx.selectedIds.includes(item.id)),
+        type: "checkbox",
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({});
     (item.id);
@@ -278,7 +384,7 @@ for (const [item] of __VLS_getVForSourceType((__VLS_ctx.records))) {
 if (!__VLS_ctx.loading && __VLS_ctx.records.length === 0) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.tr, __VLS_intrinsicElements.tr)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.td, __VLS_intrinsicElements.td)({
-        colspan: "7",
+        colspan: "8",
         ...{ class: "admin-feed-table__empty" },
     });
 }
@@ -333,10 +439,10 @@ const __VLS_7 = {
     onSave: (__VLS_ctx.handleSave)
 };
 const __VLS_8 = {
-    onHide: (__VLS_ctx.handleHide)
+    onHide: (__VLS_ctx.hideFeed)
 };
 const __VLS_9 = {
-    onRestore: (__VLS_ctx.handleRestore)
+    onRestore: (__VLS_ctx.restoreFeed)
 };
 var __VLS_2;
 /** @type {__VLS_StyleScopedClasses['admin-page']} */ ;
@@ -355,10 +461,16 @@ var __VLS_2;
 /** @type {__VLS_StyleScopedClasses['admin-feed-filters__field']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-filters__field']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-page__error']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-feed-batch']} */ ;
+/** @type {__VLS_StyleScopedClasses['gm-section-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-feed-batch__actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-feed-batch__ghost']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-table']} */ ;
 /** @type {__VLS_StyleScopedClasses['gm-section-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-table__head']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-table__scroll']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-feed-table__checkbox']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-feed-table__checkbox']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-table__meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-table__status']} */ ;
 /** @type {__VLS_StyleScopedClasses['admin-feed-table__flag']} */ ;
@@ -392,12 +504,20 @@ const __VLS_self = (await import('vue')).defineComponent({
             editorPick: editorPick,
             featured: featured,
             duplicateGroup: duplicateGroup,
+            hideFeed: hideFeed,
+            restoreFeed: restoreFeed,
             nextPage: nextPage,
             prevPage: prevPage,
             drawerOpen: drawerOpen,
+            selectedIds: selectedIds,
             sourceOptions: sourceOptions,
             categoryOptions: categoryOptions,
+            selectedCount: selectedCount,
+            allSelected: allSelected,
             formatDateTime: formatDateTime,
+            handleSelectAll: handleSelectAll,
+            handleRowSelection: handleRowSelection,
+            clearSelection: clearSelection,
             handleKeywordInput: handleKeywordInput,
             handleSourceChange: handleSourceChange,
             handleCategoryChange: handleCategoryChange,
@@ -407,8 +527,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             handleDuplicateGroupInput: handleDuplicateGroupInput,
             handleOpenDetail: handleOpenDetail,
             handleSave: handleSave,
-            handleHide: handleHide,
-            handleRestore: handleRestore,
+            runBatchAction: runBatchAction,
         };
     },
 });

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import AdminFeedEditorDrawer from '@/features/admin/components/AdminFeedEditorDrawer.vue'
 import { useAdminFeeds } from '@/features/admin/composables/useAdminFeeds'
+import type { AdminFeedBatchPayload } from '@/features/feed/types'
 
 const {
   records,
@@ -25,12 +26,15 @@ const {
   saveDetail,
   hideFeed,
   restoreFeed,
+  batchOperate,
   updateFilters,
   nextPage,
   prevPage,
 } = useAdminFeeds()
 
-const drawerOpen = shallowRef(false)
+const drawerOpen = ref(false)
+const selectedIds = ref<number[]>([])
+
 const sourceOptions = computed(() => Array.from(new Set(records.value.map((item) => item.source))).sort())
 const categoryOptions = computed(() => {
   const values = new Set<string>()
@@ -44,9 +48,39 @@ const categoryOptions = computed(() => {
   }
   return Array.from(values).sort()
 })
+const selectedCount = computed(() => selectedIds.value.length)
+const allSelected = computed({
+  get: () => records.value.length > 0 && selectedIds.value.length === records.value.length,
+  set: (value: boolean) => {
+    selectedIds.value = value ? records.value.map((item) => item.id) : []
+  },
+})
 
 function formatDateTime(value?: string | null) {
   return value ? value.replace('T', ' ') : '-'
+}
+
+function toggleSelected(id: number, checked: boolean) {
+  if (checked) {
+    if (!selectedIds.value.includes(id)) {
+      selectedIds.value = [...selectedIds.value, id]
+    }
+    return
+  }
+
+  selectedIds.value = selectedIds.value.filter((item) => item !== id)
+}
+
+function handleSelectAll(event: Event) {
+  allSelected.value = (event.target as HTMLInputElement).checked
+}
+
+function handleRowSelection(id: number, event: Event) {
+  toggleSelected(id, (event.target as HTMLInputElement).checked)
+}
+
+function clearSelection() {
+  selectedIds.value = []
 }
 
 function handleKeywordInput(event: Event) {
@@ -89,12 +123,15 @@ async function handleSave(payload: Parameters<typeof saveDetail>[1]) {
   await saveDetail(detail.value.id, payload)
 }
 
-async function handleHide(id: number) {
-  await hideFeed(id)
-}
-
-async function handleRestore(id: number) {
-  await restoreFeed(id)
+async function runBatchAction(action: AdminFeedBatchPayload['action']) {
+  if (selectedIds.value.length === 0) {
+    return
+  }
+  await batchOperate({
+    ids: selectedIds.value,
+    action,
+  })
+  clearSelection()
 }
 
 onMounted(() => {
@@ -169,6 +206,20 @@ onMounted(() => {
 
     <p v-if="errorMessage" class="admin-page__error">{{ errorMessage }}</p>
 
+    <section v-if="selectedCount > 0" class="admin-feed-batch gm-section-card">
+      <div>
+        <strong>已选 {{ selectedCount }} 条</strong>
+        <p>批量操作只影响当前选中的记录，不会改原文和重复关系。</p>
+      </div>
+      <div class="admin-feed-batch__actions">
+        <button type="button" :disabled="saving" @click="runBatchAction('hide')">批量隐藏</button>
+        <button type="button" :disabled="saving" @click="runBatchAction('restore')">批量恢复</button>
+        <button type="button" :disabled="saving" @click="runBatchAction('feature')">设为人工精选</button>
+        <button type="button" :disabled="saving" @click="runBatchAction('unfeature')">取消人工精选</button>
+        <button type="button" class="admin-feed-batch__ghost" :disabled="saving" @click="clearSelection">清空选择</button>
+      </div>
+    </section>
+
     <section class="admin-feed-table gm-section-card">
       <div class="admin-feed-table__head">
         <strong>内容列表</strong>
@@ -179,6 +230,9 @@ onMounted(() => {
         <table>
           <thead>
             <tr>
+              <th class="admin-feed-table__checkbox">
+                <input :checked="allSelected" type="checkbox" @change="handleSelectAll" />
+              </th>
               <th>ID</th>
               <th>内容</th>
               <th>来源</th>
@@ -190,10 +244,17 @@ onMounted(() => {
           </thead>
           <tbody>
             <tr v-for="item in records" :key="item.id">
+              <td class="admin-feed-table__checkbox">
+                <input
+                  :checked="selectedIds.includes(item.id)"
+                  type="checkbox"
+                  @change="handleRowSelection(item.id, $event)"
+                />
+              </td>
               <td>#{{ item.id }}</td>
               <td>
                 <strong>{{ item.adminTitle || item.title }}</strong>
-                <p class="admin-feed-table__meta">{{ item.adminCategory || item.category }} / 辣度 {{ item.adminSpicyIndex || item.spicyIndex }}</p>
+                <p class="admin-feed-table__meta">{{ item.adminCategory || item.category }} · 辣度 {{ item.adminSpicyIndex || item.spicyIndex }}</p>
               </td>
               <td>{{ item.source }}</td>
               <td>
@@ -209,7 +270,7 @@ onMounted(() => {
               </td>
             </tr>
             <tr v-if="!loading && records.length === 0">
-              <td colspan="7" class="admin-feed-table__empty">没有符合条件的内容。</td>
+              <td colspan="8" class="admin-feed-table__empty">没有符合条件的内容。</td>
             </tr>
           </tbody>
         </table>
@@ -229,8 +290,8 @@ onMounted(() => {
       :error-message="detailErrorMessage"
       @close="drawerOpen = false"
       @save="handleSave"
-      @hide="handleHide"
-      @restore="handleRestore"
+      @hide="hideFeed"
+      @restore="restoreFeed"
     />
   </section>
 </template>
@@ -243,7 +304,8 @@ onMounted(() => {
 
 .admin-page__header,
 .admin-feed-table__head,
-.admin-feed-table__footer {
+.admin-feed-table__footer,
+.admin-feed-batch {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -295,6 +357,40 @@ onMounted(() => {
   color: var(--gm-ink);
 }
 
+.admin-feed-batch {
+  padding: 16px 18px;
+  border-radius: var(--gm-radius-lg);
+  background: var(--gm-surface-tinted);
+}
+
+.admin-feed-batch p {
+  margin: 6px 0 0;
+  color: var(--gm-muted);
+  font-size: 0.9rem;
+}
+
+.admin-feed-batch__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-feed-batch__actions button,
+.admin-feed-table__action,
+.admin-feed-table__pager {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--gm-line-strong);
+  border-radius: 999px;
+  background: var(--gm-surface-strong);
+  color: var(--gm-ink);
+  cursor: pointer;
+}
+
+.admin-feed-batch__ghost {
+  background: var(--gm-surface-soft);
+}
+
 .admin-feed-table {
   display: grid;
   gap: 16px;
@@ -318,6 +414,11 @@ td {
   border-bottom: 1px solid var(--gm-line);
   text-align: left;
   vertical-align: top;
+}
+
+.admin-feed-table__checkbox {
+  width: 42px;
+  text-align: center;
 }
 
 th {
@@ -357,20 +458,9 @@ th {
 }
 
 .admin-feed-table__flag--auto {
+  margin-left: 6px;
   background: var(--gm-pill-pick-bg);
   color: var(--gm-pill-pick-text);
-  margin-left: 6px;
-}
-
-.admin-feed-table__action,
-.admin-feed-table__pager {
-  min-height: 38px;
-  padding: 0 14px;
-  border: 1px solid var(--gm-line-strong);
-  border-radius: 999px;
-  background: var(--gm-surface-strong);
-  color: var(--gm-ink);
-  cursor: pointer;
 }
 
 .admin-feed-table__empty,
@@ -385,6 +475,11 @@ th {
 
   .admin-feed-filters__field--keyword {
     grid-column: span 2;
+  }
+
+  .admin-feed-batch {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

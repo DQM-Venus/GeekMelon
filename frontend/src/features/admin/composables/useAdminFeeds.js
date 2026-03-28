@@ -114,6 +114,25 @@ export function useAdminFeeds() {
             saving.value = false;
         }
     }
+    async function batchOperate(payload) {
+        saving.value = true;
+        errorMessage.value = '';
+        try {
+            const result = await adminFetch('/admin/feeds/batch', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            });
+            await fetchFeeds();
+            return result;
+        }
+        catch (error) {
+            errorMessage.value = error instanceof Error ? error.message : '批量操作失败';
+            throw error;
+        }
+        finally {
+            saving.value = false;
+        }
+    }
     function updateFilters(next) {
         if (typeof next.keyword === 'string') {
             keyword.value = next.keyword;
@@ -175,6 +194,7 @@ export function useAdminFeeds() {
         saveDetail,
         hideFeed,
         restoreFeed,
+        batchOperate,
         updateFilters,
         nextPage,
         prevPage,

@@ -1,11 +1,11 @@
 import FeedCard from '@/features/feed/components/FeedCard.vue';
-const props = defineProps();
-const emit = defineEmits();
+const __VLS_props = defineProps();
+const __VLS_emit = defineEmits();
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {__VLS_StyleScopedClasses['feed-list__pager-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['feed-list__subtitle']} */ ;
 /** @type {__VLS_StyleScopedClasses['feed-list__pager']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
@@ -15,34 +15,40 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElemen
 __VLS_asFunctionalElement(__VLS_intrinsicElements.header, __VLS_intrinsicElements.header)({
     ...{ class: "feed-list__header" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "feed-list__eyebrow gm-mono" },
+    ...{ class: "feed-list__eyebrow" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({
     ...{ class: "feed-list__title" },
 });
-if (props.loading) {
+(__VLS_ctx.emptyFallback ? '最近一期值得一看的 AI 圈情报' : '昨天发布的 AI 圈新鲜事');
+if (__VLS_ctx.emptyFallback && __VLS_ctx.effectiveDate) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "feed-list__subtitle" },
+    });
+    (__VLS_ctx.effectiveDate);
+}
+if (__VLS_ctx.loading) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "feed-list__state gm-section-card" },
+        ...{ class: "feed-list__state feed-list__state--loading" },
     });
 }
-else if (props.errorMessage) {
+else if (__VLS_ctx.errorMessage) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "feed-list__state feed-list__state--error gm-section-card" },
+        ...{ class: "feed-list__state feed-list__state--error" },
     });
-    (props.errorMessage);
+    (__VLS_ctx.errorMessage);
 }
-else if (props.records.length === 0) {
+else if (__VLS_ctx.records.length === 0) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "feed-list__state gm-section-card" },
+        ...{ class: "feed-list__state" },
     });
 }
 else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "feed-list__grid" },
+        ...{ class: "feed-list__items" },
     });
-    for (const [item, index] of __VLS_getVForSourceType((props.records))) {
+    for (const [item, index] of __VLS_getVForSourceType((__VLS_ctx.records))) {
         /** @type {[typeof FeedCard, ]} */ ;
         // @ts-ignore
         const __VLS_0 = __VLS_asFunctionalComponent(FeedCard, new FeedCard({
@@ -62,73 +68,68 @@ else {
         let __VLS_5;
         const __VLS_6 = {
             onOpenDetail: (...[$event]) => {
-                if (!!(props.loading))
+                if (!!(__VLS_ctx.loading))
                     return;
-                if (!!(props.errorMessage))
+                if (!!(__VLS_ctx.errorMessage))
                     return;
-                if (!!(props.records.length === 0))
+                if (!!(__VLS_ctx.records.length === 0))
                     return;
-                __VLS_ctx.emit('openDetail', $event);
+                __VLS_ctx.$emit('openDetail', item.id);
             }
         };
         var __VLS_2;
     }
 }
-if (props.totalPages > 1) {
+if (__VLS_ctx.records.length > 0) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.footer, __VLS_intrinsicElements.footer)({
-        ...{ class: "feed-list__pager gm-section-card" },
+        ...{ class: "feed-list__footer" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
-                if (!(props.totalPages > 1))
+                if (!(__VLS_ctx.records.length > 0))
                     return;
-                __VLS_ctx.emit('prev');
+                __VLS_ctx.$emit('prev');
             } },
-        ...{ class: "feed-list__pager-button" },
+        ...{ class: "feed-list__pager" },
         type: "button",
-        disabled: (props.page <= 1),
+        disabled: (__VLS_ctx.page <= 1 || __VLS_ctx.loading),
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "feed-list__pager-text gm-mono" },
+        ...{ class: "feed-list__page" },
     });
-    (props.page);
-    (props.totalPages);
+    (__VLS_ctx.page);
+    (__VLS_ctx.totalPages);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
-                if (!(props.totalPages > 1))
+                if (!(__VLS_ctx.records.length > 0))
                     return;
-                __VLS_ctx.emit('next');
+                __VLS_ctx.$emit('next');
             } },
-        ...{ class: "feed-list__pager-button" },
+        ...{ class: "feed-list__pager" },
         type: "button",
-        disabled: (props.page >= props.totalPages),
+        disabled: (__VLS_ctx.page >= __VLS_ctx.totalPages || __VLS_ctx.loading),
     });
 }
 /** @type {__VLS_StyleScopedClasses['feed-list']} */ ;
 /** @type {__VLS_StyleScopedClasses['feed-list__header']} */ ;
 /** @type {__VLS_StyleScopedClasses['feed-list__eyebrow']} */ ;
-/** @type {__VLS_StyleScopedClasses['gm-mono']} */ ;
 /** @type {__VLS_StyleScopedClasses['feed-list__title']} */ ;
+/** @type {__VLS_StyleScopedClasses['feed-list__subtitle']} */ ;
 /** @type {__VLS_StyleScopedClasses['feed-list__state']} */ ;
-/** @type {__VLS_StyleScopedClasses['gm-section-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['feed-list__state--loading']} */ ;
 /** @type {__VLS_StyleScopedClasses['feed-list__state']} */ ;
 /** @type {__VLS_StyleScopedClasses['feed-list__state--error']} */ ;
-/** @type {__VLS_StyleScopedClasses['gm-section-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['feed-list__state']} */ ;
-/** @type {__VLS_StyleScopedClasses['gm-section-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['feed-list__grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['feed-list__items']} */ ;
+/** @type {__VLS_StyleScopedClasses['feed-list__footer']} */ ;
 /** @type {__VLS_StyleScopedClasses['feed-list__pager']} */ ;
-/** @type {__VLS_StyleScopedClasses['gm-section-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['feed-list__pager-button']} */ ;
-/** @type {__VLS_StyleScopedClasses['feed-list__pager-text']} */ ;
-/** @type {__VLS_StyleScopedClasses['gm-mono']} */ ;
-/** @type {__VLS_StyleScopedClasses['feed-list__pager-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['feed-list__page']} */ ;
+/** @type {__VLS_StyleScopedClasses['feed-list__pager']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             FeedCard: FeedCard,
-            emit: emit,
         };
     },
     __typeEmits: {},

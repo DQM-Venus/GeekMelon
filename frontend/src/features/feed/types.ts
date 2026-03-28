@@ -25,6 +25,9 @@ export interface FeedPageResult {
   page: number
   pageSize: number
   totalPages: number
+  effectiveDateScope?: 'yesterday' | 'fallback' | null
+  effectiveDate?: string | null
+  emptyFallback?: boolean | null
 }
 
 export interface RelatedSourceRecord {
@@ -189,6 +192,19 @@ export interface AdminFeedUpdatePayload {
   adminNote?: string
 }
 
+export interface AdminFeedBatchPayload {
+  ids: number[]
+  action: 'hide' | 'restore' | 'feature' | 'unfeature'
+}
+
+export interface AdminFeedBatchResult {
+  action: string
+  requestedCount: number
+  successCount: number
+  ignoredCount: number
+  affectedIds: number[]
+}
+
 export interface AdminSourceRecord {
   sourceKey: string
   displayName: string
@@ -196,6 +212,25 @@ export interface AdminSourceRecord {
   maxItems: number
   runOrder: number
   updatedAt: string
+}
+
+export interface AdminTaskPreviewItem {
+  title: string
+  sourceUrl: string
+  rawPublishTime?: string | null
+  category: string
+  spicyIndex: number
+  decision: 'keep' | 'drop'
+  highlight?: string | null
+  summary?: string | null
+}
+
+export interface AdminTaskPreviewRecord {
+  sourceKey: string
+  runId: string
+  previewCount: number
+  filteredCount: number
+  items: AdminTaskPreviewItem[]
 }
 
 export interface AdminTaskRunRecord {

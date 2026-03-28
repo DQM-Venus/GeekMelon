@@ -2,15 +2,17 @@
 import FeedCard from '@/features/feed/components/FeedCard.vue'
 import type { FeedRecord } from '@/features/feed/types'
 
-const props = defineProps<{
+defineProps<{
   records: readonly FeedRecord[]
   loading: boolean
   errorMessage: string
   page: number
   totalPages: number
+  effectiveDate?: string | null
+  emptyFallback?: boolean
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   prev: []
   next: []
   openDetail: [id: number]
@@ -20,40 +22,40 @@ const emit = defineEmits<{
 <template>
   <section class="feed-list">
     <header class="feed-list__header">
-      <div>
-        <p class="feed-list__eyebrow gm-mono">YESTERDAY FILES</p>
-        <h2 class="feed-list__title">昨天发布的 AI 圈新鲜事</h2>
-      </div>
+      <p class="feed-list__eyebrow">YESTERDAY FILES</p>
+      <h2 class="feed-list__title">
+        {{ emptyFallback ? '最近一期值得一看的 AI 圈情报' : '昨天发布的 AI 圈新鲜事' }}
+      </h2>
+      <p v-if="emptyFallback && effectiveDate" class="feed-list__subtitle">
+        昨天空窗，当前展示最近一期情报：{{ effectiveDate }}
+      </p>
     </header>
 
-    <div v-if="props.loading" class="feed-list__state gm-section-card">
-      正在整理昨天的资讯流...
+    <div v-if="loading" class="feed-list__state feed-list__state--loading">
+      正在整理情报流...
     </div>
-
-    <div v-else-if="props.errorMessage" class="feed-list__state feed-list__state--error gm-section-card">
-      {{ props.errorMessage }}
+    <div v-else-if="errorMessage" class="feed-list__state feed-list__state--error">
+      {{ errorMessage }}
     </div>
-
-    <div v-else-if="props.records.length === 0" class="feed-list__state gm-section-card">
-      昨天没有抓到适合公开展示的新内容，今晚补采后会自动更新。
+    <div v-else-if="records.length === 0" class="feed-list__state">
+      暂时还没有可公开展示的情报。
     </div>
-
-    <div v-else class="feed-list__grid">
+    <div v-else class="feed-list__items">
       <FeedCard
-        v-for="(item, index) in props.records"
+        v-for="(item, index) in records"
         :key="item.id"
         :item="item"
         :index="index"
-        @open-detail="emit('openDetail', $event)"
+        @open-detail="$emit('openDetail', item.id)"
       />
     </div>
 
-    <footer v-if="props.totalPages > 1" class="feed-list__pager gm-section-card">
-      <button class="feed-list__pager-button" type="button" :disabled="props.page <= 1" @click="emit('prev')">
+    <footer v-if="records.length > 0" class="feed-list__footer">
+      <button class="feed-list__pager" type="button" :disabled="page <= 1 || loading" @click="$emit('prev')">
         上一页
       </button>
-      <span class="feed-list__pager-text gm-mono">第 {{ props.page }} / {{ props.totalPages }} 页</span>
-      <button class="feed-list__pager-button" type="button" :disabled="props.page >= props.totalPages" @click="emit('next')">
+      <span class="feed-list__page">{{ page }} / {{ totalPages }}</span>
+      <button class="feed-list__pager" type="button" :disabled="page >= totalPages || loading" @click="$emit('next')">
         下一页
       </button>
     </footer>
@@ -62,81 +64,75 @@ const emit = defineEmits<{
 
 <style scoped>
 .feed-list {
-  margin-top: 20px;
-  padding-bottom: 42px;
+  display: grid;
+  gap: 18px;
 }
 
 .feed-list__header {
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  align-items: end;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 10px;
 }
 
 .feed-list__eyebrow {
   margin: 0;
   color: var(--gm-melon-deep);
-  font-size: 0.76rem;
-  letter-spacing: 0.14em;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
 }
 
-.feed-list__title {
-  margin: 8px 0 0;
-  font-family: 'ZCOOL XiaoWei', serif;
-  font-size: 1.9rem;
+.feed-list__title,
+.feed-list__subtitle {
+  margin: 0;
 }
 
-.feed-list__grid {
+.feed-list__subtitle {
+  color: var(--gm-muted);
+  font-size: 0.95rem;
+}
+
+.feed-list__items {
   display: grid;
   gap: 18px;
 }
 
 .feed-list__state {
-  padding: 22px;
-  border-radius: 24px;
+  padding: 18px 20px;
+  border: 1px solid var(--gm-line);
+  border-radius: var(--gm-radius-lg);
+  background: var(--gm-surface-soft);
   color: var(--gm-muted);
 }
 
 .feed-list__state--error {
-  color: #892d25;
-  background: rgba(255, 132, 89, 0.12);
+  color: #ff9b73;
+}
+
+.feed-list__footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
 }
 
 .feed-list__pager {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  margin-top: 18px;
-  padding: 14px 18px;
-  border-radius: 24px;
-}
-
-.feed-list__pager-button {
-  min-width: 108px;
   min-height: 42px;
+  padding: 0 16px;
   border: 1px solid var(--gm-line-strong);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.84);
+  background: var(--gm-surface-soft);
   color: var(--gm-ink);
   cursor: pointer;
 }
 
-.feed-list__pager-button:disabled {
-  opacity: 0.5;
+.feed-list__pager:disabled {
   cursor: not-allowed;
+  opacity: 0.56;
 }
 
-.feed-list__pager-text {
+.feed-list__page {
   color: var(--gm-muted);
-  font-size: 0.84rem;
-}
-
-@media (max-width: 720px) {
-  .feed-list__pager {
-    flex-direction: column;
-  }
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.9rem;
 }
 </style>

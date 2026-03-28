@@ -1,6 +1,6 @@
 import { readonly, shallowRef } from 'vue'
 import { adminFetch } from '@/features/admin/composables/adminApi'
-import type { AdminSourceRecord, AdminTaskRunRecord } from '@/features/feed/types'
+import type { AdminSourceRecord, AdminTaskPreviewRecord, AdminTaskRunRecord } from '@/features/feed/types'
 
 export function useAdminSources() {
   const sources = shallowRef<AdminSourceRecord[]>([])
@@ -64,6 +64,22 @@ export function useAdminSources() {
     }
   }
 
+  async function previewSource(sourceKey: string) {
+    saving.value = true
+    errorMessage.value = ''
+    try {
+      return await adminFetch<AdminTaskPreviewRecord>('/admin/tasks/preview', {
+        method: 'POST',
+        body: JSON.stringify({ sourceKey }),
+      })
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '预览抓取失败'
+      throw error
+    } finally {
+      saving.value = false
+    }
+  }
+
   return {
     sources: readonly(sources),
     runs: readonly(runs),
@@ -73,5 +89,6 @@ export function useAdminSources() {
     fetchSources,
     saveSource,
     runCollect,
+    previewSource,
   }
 }

@@ -2,6 +2,7 @@ package com.geekmelon.backend.controller;
 
 import com.geekmelon.backend.dto.AdminSourceConfigResponse;
 import com.geekmelon.backend.dto.AdminSourceUpdateRequest;
+import com.geekmelon.backend.dto.AdminTaskPreviewResponse;
 import com.geekmelon.backend.dto.AdminTaskRunLogResponse;
 import com.geekmelon.backend.dto.AdminTaskTriggerRequest;
 import com.geekmelon.backend.dto.ApiResponse;
@@ -47,6 +48,11 @@ public class AdminSourceController {
     @PostMapping("/tasks/collect")
     public ResponseEntity<ApiResponse<AdminTaskRunLogResponse>> collect(@Valid @RequestBody AdminTaskTriggerRequest request) {
         return ResponseEntity.ok(ApiResponse.success("任务执行完成", adminTaskService.triggerManualCollect(request.sourceKey())));
+    }
+
+    @PostMapping("/tasks/preview")
+    public ResponseEntity<ApiResponse<AdminTaskPreviewResponse>> preview(@Valid @RequestBody AdminTaskTriggerRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("预览抓取完成", adminTaskService.previewSource(request.sourceKey())));
     }
 
     @GetMapping("/tasks/runs")

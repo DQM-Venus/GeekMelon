@@ -20,6 +20,7 @@ class FeedQueryYesterdayIntegrationTest extends BackendIntegrationTestSupport {
                         .param("date_scope", "yesterday"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.effectiveDateScope").value("yesterday"))
                 .andExpect(jsonPath("$.data.records.length()").value(2));
     }
 
@@ -53,5 +54,22 @@ class FeedQueryYesterdayIntegrationTest extends BackendIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.page").value(1))
                 .andExpect(jsonPath("$.data.totalPages").value(1))
                 .andExpect(jsonPath("$.data.records.length()").value(3));
+    }
+
+    @Test
+    void shouldFallbackToLatestAvailableDateWhenYesterdayIsEmpty() throws Exception {
+        saveFeed("cls", "older-1", "older item 1", yesterdayAt(10, 0).minusDays(1), yesterdayAt(10, 0).minusDays(1));
+        saveFeed("kr36", "older-2", "older item 2", yesterdayAt(15, 0).minusDays(1), yesterdayAt(15, 0).minusDays(1));
+
+        mockMvc.perform(get("/api/feeds")
+                        .param("page", "1")
+                        .param("page_size", "10")
+                        .param("date_scope", "yesterday"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.emptyFallback").value(true))
+                .andExpect(jsonPath("$.data.effectiveDateScope").value("fallback"))
+                .andExpect(jsonPath("$.data.effectiveDate").isNotEmpty())
+                .andExpect(jsonPath("$.data.records[0].title").value("older item 1"));
     }
 }

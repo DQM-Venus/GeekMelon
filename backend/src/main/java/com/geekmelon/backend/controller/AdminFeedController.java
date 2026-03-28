@@ -1,11 +1,14 @@
 package com.geekmelon.backend.controller;
 
+import com.geekmelon.backend.dto.AdminFeedBatchRequest;
+import com.geekmelon.backend.dto.AdminFeedBatchResponse;
 import com.geekmelon.backend.dto.AdminFeedDetailResponse;
 import com.geekmelon.backend.dto.AdminFeedListItemResponse;
 import com.geekmelon.backend.dto.AdminFeedUpdateRequest;
 import com.geekmelon.backend.dto.ApiResponse;
 import com.geekmelon.backend.dto.PageResult;
 import com.geekmelon.backend.service.AdminFeedService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -73,5 +76,15 @@ public class AdminFeedController {
     @PostMapping("/{id}/restore")
     public ResponseEntity<ApiResponse<AdminFeedDetailResponse>> restore(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("已恢复", adminFeedService.restore(id)));
+    }
+
+    @PostMapping("/batch")
+    public ResponseEntity<ApiResponse<AdminFeedBatchResponse>> batch(@Valid @RequestBody AdminFeedBatchRequest request) {
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "批量操作完成",
+                        adminFeedService.batchUpdate(request.ids(), request.action())
+                )
+        );
     }
 }
