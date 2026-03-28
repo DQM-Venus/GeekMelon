@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from sources.aibase_source import AIBaseConfig
 from sources.cls_ai_source import ClsAiConfig
 from sources.jiqizhixin_source import JiqizhixinConfig
 from sources.juejin_ai_source import JuejinAiConfig
@@ -10,6 +11,7 @@ from sources.kr36_source import Kr36Config
 from sources.qbitai_source import QbitaiConfig
 from sources.rss_source import RssFeedConfig
 from sources.toutiao_hot_source import ToutiaoHotConfig
+from sources.zhidx_source import ZhidxConfig
 
 
 @dataclass(frozen=True)
@@ -25,6 +27,8 @@ class AppConfig:
     cls_ai_config: ClsAiConfig
     qbitai_config: QbitaiConfig
     jiqizhixin_config: JiqizhixinConfig
+    aibase_config: AIBaseConfig
+    zhidx_config: ZhidxConfig
     deepseek_enabled: bool
     deepseek_api_key: str
     deepseek_base_url: str
@@ -94,6 +98,17 @@ def load_config() -> AppConfig:
             feed_url=os.getenv("GM_JIQIZHIXIN_FEED_URL", "").strip(),
             max_items=int(os.getenv("GM_JIQIZHIXIN_MAX_ITEMS", "8")),
             request_timeout_seconds=int(os.getenv("GM_JIQIZHIXIN_REQUEST_TIMEOUT_SECONDS", "20")),
+        ),
+        aibase_config=AIBaseConfig(
+            page_url=os.getenv("GM_AIBASE_PAGE_URL", "https://news.aibase.com/zh/news").strip(),
+            max_items=int(os.getenv("GM_AIBASE_MAX_ITEMS", "8")),
+            request_timeout_seconds=int(os.getenv("GM_AIBASE_REQUEST_TIMEOUT_SECONDS", "20")),
+        ),
+        zhidx_config=ZhidxConfig(
+            page_url=os.getenv("GM_ZHIDX_PAGE_URL", "https://zhidx.com/p/category/zhidongxi/topnews").strip(),
+            max_items=int(os.getenv("GM_ZHIDX_MAX_ITEMS", "8")),
+            request_timeout_seconds=int(os.getenv("GM_ZHIDX_REQUEST_TIMEOUT_SECONDS", "20")),
+            detail_timeout_seconds=int(os.getenv("GM_ZHIDX_DETAIL_TIMEOUT_SECONDS", "20")),
         ),
         deepseek_enabled=os.getenv("GM_ENABLE_DEEPSEEK", "false").strip().lower() == "true",
         deepseek_api_key=os.getenv("DEEPSEEK_API_KEY", "").strip(),

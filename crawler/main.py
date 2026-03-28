@@ -11,6 +11,7 @@ from app_config import load_config
 from publish_window import filter_items_for_yesterday
 from publisher import FeedPublisher
 from run_logger import current_run_id, emit_log
+from sources.aibase_source import AIBaseCollector
 from sources.cls_ai_source import ClsAiCollector
 from sources.jiqizhixin_source import JiqizhixinCollector
 from sources.juejin_ai_source import JuejinAiCollector
@@ -19,8 +20,18 @@ from sources.mock_source import build_mock_feed_item
 from sources.qbitai_source import QbitaiCollector
 from sources.rss_source import RssCollector
 from sources.toutiao_hot_source import ToutiaoHotCollector
+from sources.zhidx_source import ZhidxCollector
 
-DATE_FILTERED_SOURCES = {"cls_ai", "qbitai", "kr36", "juejin_ai", "jiqizhixin", "china_mix"}
+DATE_FILTERED_SOURCES = {
+    "cls_ai",
+    "qbitai",
+    "kr36",
+    "juejin_ai",
+    "jiqizhixin",
+    "aibase",
+    "zhidx",
+    "china_mix",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,6 +47,8 @@ def parse_args() -> argparse.Namespace:
             "cls_ai",
             "qbitai",
             "jiqizhixin",
+            "aibase",
+            "zhidx",
             "china_mix",
         ],
         default=None,
@@ -63,6 +76,10 @@ def build_items(source_name: str, config) -> list:
         if not config.jiqizhixin_config.feed_url:
             raise ValueError("机器之心当前没有配置可用的公开 feed，请先设置 GM_JIQIZHIXIN_FEED_URL。")
         return JiqizhixinCollector(config.jiqizhixin_config).collect()
+    if source_name == "aibase":
+        return AIBaseCollector(config.aibase_config).collect()
+    if source_name == "zhidx":
+        return ZhidxCollector(config.zhidx_config).collect()
     if source_name == "china_mix":
         return [
             *ClsAiCollector(config.cls_ai_config).collect(),

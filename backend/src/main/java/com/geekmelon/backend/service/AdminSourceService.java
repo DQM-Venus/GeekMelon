@@ -7,7 +7,6 @@ import com.geekmelon.backend.exception.BizException;
 import com.geekmelon.backend.repository.AdminSourceConfigRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -79,11 +78,17 @@ public class AdminSourceService {
         AdminSourceConfig entity = new AdminSourceConfig();
         entity.setSourceKey(definition.sourceKey());
         entity.setDisplayName(definition.displayName());
-        entity.setEnabled(!"jiqizhixin".equals(definition.sourceKey()));
+        entity.setEnabled(isEnabledByDefault(definition.sourceKey()));
         entity.setMaxItems(definition.defaultMaxItems());
         entity.setRunOrder(definition.defaultRunOrder());
         entity.setUpdatedAt(LocalDateTime.now());
         return adminSourceConfigRepository.save(entity);
+    }
+
+    private boolean isEnabledByDefault(String sourceKey) {
+        return !"jiqizhixin".equals(sourceKey)
+                && !"aibase".equals(sourceKey)
+                && !"zhidx".equals(sourceKey);
     }
 
     private AdminSourceConfigResponse toResponse(AdminSourceConfig entity) {

@@ -1,8 +1,6 @@
 package com.geekmelon.backend.service;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 public final class AdminSourceCatalog {
 
@@ -12,7 +10,9 @@ public final class AdminSourceCatalog {
             new ManagedSourceDefinition("kr36", "36氪热榜与快讯", 8, 30, "kr36"),
             new ManagedSourceDefinition("toutiao", "今日头条热榜", 8, 40, "toutiao_hot"),
             new ManagedSourceDefinition("juejin", "掘金 AI", 8, 50, "juejin_ai"),
-            new ManagedSourceDefinition("jiqizhixin", "机器之心", 8, 60, "jiqizhixin")
+            new ManagedSourceDefinition("jiqizhixin", "机器之心", 8, 60, "jiqizhixin"),
+            new ManagedSourceDefinition("aibase", "AIBase 新闻", 8, 70, "aibase"),
+            new ManagedSourceDefinition("zhidx", "智东西头条", 8, 80, "zhidx")
     );
 
     private AdminSourceCatalog() {

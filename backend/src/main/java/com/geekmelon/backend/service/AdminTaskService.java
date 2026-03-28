@@ -211,6 +211,8 @@ public class AdminTaskService {
             case "toutiao" -> processBuilder.environment().put("GM_TOUTIAO_HOT_MAX_ITEMS", String.valueOf(maxItems));
             case "juejin" -> processBuilder.environment().put("GM_JUEJIN_AI_MAX_ITEMS", String.valueOf(maxItems));
             case "jiqizhixin" -> processBuilder.environment().put("GM_JIQIZHIXIN_MAX_ITEMS", String.valueOf(maxItems));
+            case "aibase" -> processBuilder.environment().put("GM_AIBASE_MAX_ITEMS", String.valueOf(maxItems));
+            case "zhidx" -> processBuilder.environment().put("GM_ZHIDX_MAX_ITEMS", String.valueOf(maxItems));
             case "kr36" -> {
                 int hotItems = Math.max(1, (maxItems + 1) / 2);
                 int flashItems = Math.max(1, maxItems - hotItems);
