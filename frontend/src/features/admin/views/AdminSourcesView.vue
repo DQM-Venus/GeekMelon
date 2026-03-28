@@ -1,17 +1,35 @@
 <script setup lang="ts">
-import { onMounted, reactive, watch } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import AdminTaskRunList from '@/features/admin/components/AdminTaskRunList.vue'
 import { useAdminSources } from '@/features/admin/composables/useAdminSources'
+import type { AdminSourceRecord } from '@/features/feed/types'
 
 const { sources, runs, loading, saving, errorMessage, fetchSources, saveSource, runCollect } = useAdminSources()
 
 const draftMap = reactive<Record<string, { enabled: boolean; maxItems: number; runOrder: number }>>({})
+const collectingSourceKey = ref('')
 
 function ensureDraft(sourceKey: string, enabled: boolean, maxItems: number, runOrder: number) {
   if (!draftMap[sourceKey]) {
     draftMap[sourceKey] = { enabled, maxItems, runOrder }
   }
   return draftMap[sourceKey]
+}
+
+function findSource(sourceKey: string) {
+  return sources.value.find((item) => item.sourceKey === sourceKey)
+}
+
+function hasUnsavedChanges(source: AdminSourceRecord) {
+  const draft = draftMap[source.sourceKey]
+  if (!draft) {
+    return false
+  }
+  return (
+    draft.enabled !== source.enabled
+    || draft.maxItems !== source.maxItems
+    || draft.runOrder !== source.runOrder
+  )
 }
 
 async function handleSave(sourceKey: string) {
@@ -23,7 +41,22 @@ async function handleSave(sourceKey: string) {
 }
 
 async function handleCollect(sourceKey: string) {
-  await runCollect(sourceKey)
+  const source = findSource(sourceKey)
+  const draft = draftMap[sourceKey]
+  if (!source || !draft) {
+    return
+  }
+
+  collectingSourceKey.value = sourceKey
+  try {
+    if (hasUnsavedChanges(source)) {
+      await saveSource(sourceKey, draft)
+    }
+    await runCollect(sourceKey)
+    await fetchSources()
+  } finally {
+    collectingSourceKey.value = ''
+  }
 }
 
 onMounted(async () => {
@@ -86,14 +119,16 @@ watch(
         <p class="admin-source-card__meta">最近更新时间：{{ item.updatedAt.replace('T', ' ') }}</p>
 
         <footer class="admin-source-card__footer">
-          <button class="admin-source-card__action" type="button" :disabled="saving" @click="handleSave(item.sourceKey)">保存</button>
+          <button class="admin-source-card__action" type="button" :disabled="saving" @click="handleSave(item.sourceKey)">
+            保存
+          </button>
           <button
             class="admin-source-card__action admin-source-card__action--ghost"
             type="button"
-            :disabled="saving || !ensureDraft(item.sourceKey, item.enabled, item.maxItems, item.runOrder).enabled"
+            :disabled="saving || collectingSourceKey === item.sourceKey || !ensureDraft(item.sourceKey, item.enabled, item.maxItems, item.runOrder).enabled"
             @click="handleCollect(item.sourceKey)"
           >
-            手动抓取
+            {{ collectingSourceKey === item.sourceKey ? '抓取中...' : '手动抓取' }}
           </button>
         </footer>
       </article>
@@ -139,6 +174,12 @@ watch(
   background: var(--gm-surface-strong);
   color: var(--gm-ink);
   cursor: pointer;
+}
+
+.admin-page__refresh:disabled,
+.admin-source-card__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .admin-source-grid {
