@@ -9,6 +9,7 @@ import { useThemePreference } from '@/composables/useThemePreference'
 
 const {
   records,
+  headlineRecords,
   page,
   totalPages,
   loading,
@@ -40,6 +41,8 @@ const {
       :date-label="effectiveDateLabel"
       :empty-fallback="emptyFallback"
       :effective-date="effectiveDate"
+      :headlines="headlineRecords"
+      @open-detail="openDetail"
     />
 
     <FeedToolbar

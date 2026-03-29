@@ -87,6 +87,7 @@ export function useFeedQuery() {
     const toIndex = fromIndex + pageSize.value
     return sortedRecords.value.slice(fromIndex, toIndex)
   })
+  const headlineRecords = computed(() => sortedRecords.value.slice(0, 5))
 
   async function fetchFeeds() {
     loading.value = true
@@ -156,6 +157,7 @@ export function useFeedQuery() {
 
   return {
     records: readonly(records),
+    headlineRecords: readonly(headlineRecords),
     total: readonly(total),
     page: readonly(page),
     pageSize: readonly(pageSize),
