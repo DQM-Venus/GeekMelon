@@ -86,13 +86,15 @@ def load_config() -> AppConfig:
         ),
         cls_ai_config=ClsAiConfig(
             page_url=os.getenv("GM_CLS_AI_PAGE_URL", "https://www.cls.cn/subject/1321").strip(),
-            max_items=int(os.getenv("GM_CLS_AI_MAX_ITEMS", "8")),
+            max_items=int(os.getenv("GM_CLS_AI_MAX_ITEMS", "20")),
             request_timeout_seconds=int(os.getenv("GM_CLS_AI_REQUEST_TIMEOUT_SECONDS", "20")),
         ),
         qbitai_config=QbitaiConfig(
             feed_url=os.getenv("GM_QBITAI_FEED_URL", "https://www.qbitai.com/feed").strip(),
-            max_items=int(os.getenv("GM_QBITAI_MAX_ITEMS", "8")),
+            page_url=os.getenv("GM_QBITAI_PAGE_URL", "https://www.qbitai.com/").strip(),
+            max_items=int(os.getenv("GM_QBITAI_MAX_ITEMS", "20")),
             request_timeout_seconds=int(os.getenv("GM_QBITAI_REQUEST_TIMEOUT_SECONDS", "20")),
+            detail_timeout_seconds=int(os.getenv("GM_QBITAI_DETAIL_TIMEOUT_SECONDS", "20")),
         ),
         jiqizhixin_config=JiqizhixinConfig(
             feed_url=os.getenv("GM_JIQIZHIXIN_FEED_URL", "").strip(),

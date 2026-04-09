@@ -92,7 +92,6 @@ def build_items(source_name: str, config) -> list:
             *ClsAiCollector(config.cls_ai_config).collect(),
             *QbitaiCollector(config.qbitai_config).collect(),
             *Kr36Collector(config.kr36_config).collect(),
-            *JuejinAiCollector(config.juejin_ai_config).collect(),
         ]
     raise ValueError(f"不支持的数据源：{source_name}")
 
